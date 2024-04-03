@@ -31,8 +31,9 @@ class TrainingConfig:
     micro_batch_size: int = 8
     gradient_accumulation_steps: int = 4
     learning_rate: float = 1e-5
-    warmup_steps:int = 100
-    max_ctx_len: int = 1512
+    lr_scheduler_type: str = "linear"
+    warmup_steps: int = 100
+    max_ctx_len: int = 2048
     logging_steps: int = 5
     eval_steps: int = 60
     save_steps: int = 60

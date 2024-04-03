@@ -70,20 +70,26 @@ def main(
                 random_state=322
             )
         model.print_trainable_parameters()
+        
         total_batch_size = config.micro_batch_size * config.gradient_accumulation_steps
         training_steps = data_iterations // total_batch_size
         progress.print('Total training steps:', training_steps)
+        
         training_arguments = transformers.TrainingArguments(
             per_device_train_batch_size=config.micro_batch_size,
             gradient_accumulation_steps=config.gradient_accumulation_steps,
             warmup_steps=config.warmup_steps,
             max_steps=training_steps,
+            max_grad_norm=1.0,
             learning_rate=config.learning_rate,
-            lr_scheduler_type = "linear",
+            lr_scheduler_type=config.lr_scheduler_type,
             fp16 = not torch.cuda.is_bf16_supported(),
             bf16 = torch.cuda.is_bf16_supported(),
             logging_steps=config.logging_steps,
             optim="adamw_8bit",
+            adam_beta1=0.9,
+            adam_beta2=0.95,
+            adam_epsilon=0.00001,
             evaluation_strategy="steps" if val_data is not None else "no",
             save_strategy="steps",
             eval_steps=config.eval_steps,

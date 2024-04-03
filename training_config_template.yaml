@@ -24,6 +24,7 @@ modules_to_save: ["embed_tokens", "lm_head"]
 micro_batch_size: 1
 gradient_accumulation_steps: 64
 learning_rate: 0.0001
+lr_scheduler_type: "cosine"
 warmup_steps: 120
 max_ctx_len: 8192
 logging_steps: 5
