@@ -90,6 +90,7 @@ def main(
             adam_beta1=0.9,
             adam_beta2=0.95,
             adam_epsilon=0.00001,
+            gradient_checkpointing=True,
             evaluation_strategy="steps" if val_data is not None else "no",
             save_strategy="steps",
             eval_steps=config.eval_steps,

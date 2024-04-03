@@ -35,7 +35,12 @@ class SimpleDataGen:
         if self.current_iter == self.iterations:
             raise StopIteration()
         
-        return self.samples[self.current_iter]
+        if self.current_iter % len(self.samples) == 0:
+            # An epoch has passed, reshuffle dataset
+            random.shuffle(self.samples)
+        
+        idx = self.current_iter % len(self.samples)
+        return self.samples[idx]
 
     def __call__(self):
         return self.__iter__()
