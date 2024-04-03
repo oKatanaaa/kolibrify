@@ -29,17 +29,18 @@ def main(
     ) as progress:
         # --- Load datasets and model
         task1 = progress.add_task(description="Loading dataset...", total=None)
-        train_data, val_data = load_dataset(
-            train_datasets=config.train_datasets, 
+        train_data, val_data, data_iterations = load_dataset(
+            stages=config.stages, 
             val_dataset_path=config.val_dataset_file
         )
+        progress.print('Total data iterations:', data_iterations)
         progress.advance(task1)
         
         task2 = progress.add_task(description="Loading model...", total=None)
         model, tokenizer = get_model(
             model_name=config.model, 
             max_seq_length=config.max_ctx_len, 
-            update_tokenizer=config.update_tokenizer, 
+            do_update_tokenizer=config.update_tokenizer, 
             token=config.access_token,
             load_in_4bit=config.load_in_4bit,
             resize_model_vocab=32001 if config.continued_training else None
@@ -69,12 +70,14 @@ def main(
                 random_state=322
             )
         model.print_trainable_parameters()
-        
+        total_batch_size = config.micro_batch_size * config.gradient_accumulation_steps
+        training_steps = data_iterations // total_batch_size
+        progress.print('Total training steps:', training_steps)
         training_arguments = transformers.TrainingArguments(
             per_device_train_batch_size=config.micro_batch_size,
             gradient_accumulation_steps=config.gradient_accumulation_steps,
             warmup_steps=config.warmup_steps,
-            max_steps=config.train_steps,
+            max_steps=training_steps,
             learning_rate=config.learning_rate,
             lr_scheduler_type = "linear",
             fp16 = not torch.cuda.is_bf16_supported(),
