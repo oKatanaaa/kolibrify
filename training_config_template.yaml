@@ -1,0 +1,26 @@
+model: "base_model_from_huggingface"
+continued_training: False
+access_token: null
+output_dir: "output_directory"
+train_datasets:
+  - path: "path to dataset 1"
+  - path: "path to dataset 2"
+val_dataset_file: null
+lora_r: 64
+lora_alpha: 64
+lora_dropout: 0 # Any is okay, but 0 is optimized in unsloth
+lora_target_modules: ["q_proj", "k_proj", "v_proj", "o_proj",
+                      "gate_proj", "up_proj", "down_proj"]
+modules_to_save: ["embed_tokens", "lm_head"]
+micro_batch_size: 1
+gradient_accumulation_steps: 64
+learning_rate: 0.0001
+train_steps: 1400
+warmup_steps: 120
+max_ctx_len: 8192
+logging_steps: 5
+eval_steps: 50
+save_steps: 500
+save_total_limit: 8
+update_tokenizer: True
+load_in_4bit: False

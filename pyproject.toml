@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools >= 68.2.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kolibrify"
+dynamic = ["version"]
+dependencies = [
+  "datasets ~= 2.16.1",
+  "rich ~= 13.7.0",
+  "typer ~= 0.9.0",
+  "transformers ~= 4.38.1",
+  "trl ~= 0.7.11",
+  "unsloth ~= 2024.2"
+]
+requires-python = ">=3.10"
+authors = [
+  {name = "Igor Kilbas", email = "whitemarsstudios@gmail.com"}
+]
+maintainers = [
+  {name = "Igor Kilbas", email = "whitemarsstudios@gmail.com"}
+]
+description = "A small framework for curriculum training of LLMs"
+readme = "README.rst"
+license = {file = "LICENSE"}
+keywords = ["large language model", "finetuning", "llm finetuning", "gpt", "instruction following"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Topic :: Software Development :: LLM Development",
+  "Programming Language :: Python"
+]
+
+[tool.setuptools.dynamic]
+version = {attr = "kolibrify.__version__"}
+
+[project.urls]
+Homepage = "https://example.com"
+Documentation = "https://readthedocs.org"
+Repository = "https://github.com/me/spam.git"
+"Bug Tracker" = "https://github.com/me/spam/issues"
+Changelog = "https://github.com/me/spam/blob/master/CHANGELOG.md"
+
+[project.scripts]
+kolibrify-train = "kolibrify.finetune:run"
+kolibrify-merge = "kolibrify.merge_lora:run"
