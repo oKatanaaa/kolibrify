@@ -1,6 +1,8 @@
 import typer
 from typing_extensions import Annotated
 from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
+import os
+import yaml
 
 import torch
 torch.manual_seed(0)
@@ -18,8 +20,13 @@ from .config import load_training_config
 def main(
     config_path: Annotated[str, typer.Argument()] = "training_config.yaml"
 ):
-    config = load_training_config(config_path)
+    yaml_config, config = load_training_config(config_path)
     print(config)
+    
+    os.makedirs(config.output_dir, exist_ok=True)
+    with open(os.path.join(config.output_dir, 'kolibrify-config.yaml'), 'w') as f:
+        yaml.safe_dump(yaml_config, f)
+        print('Saved config in the output directory.')
     
     with Progress(
         SpinnerColumn(),

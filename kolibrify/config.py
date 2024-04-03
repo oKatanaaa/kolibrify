@@ -30,6 +30,7 @@ class TrainingConfig:
     modules_to_save: List[str] = field(default_factory=lambda: ["embed_tokens", "lm_head"])
     micro_batch_size: int = 8
     gradient_accumulation_steps: int = 4
+    max_grad_norm: float = 1.0
     learning_rate: float = 1e-5
     lr_scheduler_type: str = "linear"
     warmup_steps: int = 100
@@ -67,7 +68,7 @@ def load_stage_configs(stage_dicts: list) -> List[StageConfig]:
         
 
 
-def load_training_config(config_path) -> TrainingConfig:
+def load_training_config(config_path) -> tuple[dict, TrainingConfig]:
     with open(config_path) as f:
         config = yaml.safe_load(f)
     
@@ -84,7 +85,7 @@ def load_training_config(config_path) -> TrainingConfig:
 
     stages = load_stage_configs(_config['stages'])
     _config['stages'] = stages
-    return TrainingConfig(**_config)
+    return config, TrainingConfig(**_config)
 
 
 if __name__ == "__main__":
