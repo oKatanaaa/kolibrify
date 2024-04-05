@@ -12,18 +12,15 @@ def merge(
     adapter_path: Annotated[str, typer.Option()] = None,
     base_model: Annotated[str, typer.Option()] = None
 ):
-    config = load_training_config(config_path)
+    _, config = load_training_config(config_path)
     
     if adapter_path is None:
         adapter_path = config.output_dir
     
-    if base_model is None:
-        base_model = config.model
-    
     # Do not load in 8-bit to be able to merge
     # Do not load on gpu to avoid OOM
-    model, tokenizer = get_model(base_model, load_in_4bit=False, device_map=None,
-                                 max_seq_length=config.max_ctx_len, 
+    model, tokenizer = get_model(adapter_path, load_in_4bit=False, device_map=None,
+                                 max_seq_length=config.max_ctx_len,
             do_update_tokenizer=config.update_tokenizer)
     print('Loaded model.')
     

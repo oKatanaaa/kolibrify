@@ -33,6 +33,7 @@ class TrainingConfig:
     max_grad_norm: float = 1.0
     learning_rate: float = 1e-5
     lr_scheduler_type: str = "linear"
+    lr_scheduler_kwargs: Optional[dict] = None
     warmup_steps: int = 100
     max_ctx_len: int = 2048
     logging_steps: int = 5

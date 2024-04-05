@@ -10,11 +10,12 @@ def get_model(
     max_seq_length=4096, device_map='auto', 
     do_update_tokenizer=False, token=None, resize_model_vocab=None
 ):
-    # if resize_model_vocab is not None:
-    #     peft_config = PeftConfig.from_pretrained(model_name, token = token)
-    #     _model_name = peft_config.base_model_name_or_path
-    #     _tokenizer = Tokenizer.from_pretrained(_model_name)
-    #     resize_model_vocab = _tokenizer.get_vocab_size() + 1
+    #if resize_model_vocab is not None:
+    # peft_config = PeftConfig.from_pretrained(model_name, token = token)
+    # _model_name = peft_config.base_model_name_or_path
+    if resize_model_vocab is None:
+        _tokenizer = Tokenizer.from_pretrained(model_name)
+        resize_model_vocab = _tokenizer.get_vocab_size() + 1
         
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name=model_name,
@@ -22,10 +23,11 @@ def get_model(
         max_seq_length=max_seq_length,
         device_map=device_map,
         token=token,
-        #resize_model_vocab=resize_model_vocab
+        resize_model_vocab=resize_model_vocab
     )
     tokenizer = update_tokenizer(tokenizer)
-    model.resize_token_embeddings(len(tokenizer))
+    # if resize_model_vocab is None:
+    #     model.resize_token_embeddings(len(tokenizer))
     return model, tokenizer
 
 

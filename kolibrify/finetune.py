@@ -25,7 +25,7 @@ def main(
     
     os.makedirs(config.output_dir, exist_ok=True)
     with open(os.path.join(config.output_dir, 'kolibrify-config.yaml'), 'w') as f:
-        yaml.safe_dump(yaml_config, f)
+        yaml.safe_dump(yaml_config, f, sort_keys=False)
         print('Saved config in the output directory.')
     
     with Progress(
@@ -87,16 +87,17 @@ def main(
             gradient_accumulation_steps=config.gradient_accumulation_steps,
             warmup_steps=config.warmup_steps,
             max_steps=training_steps,
-            max_grad_norm=1.0,
+            max_grad_norm=config.max_grad_norm,
             learning_rate=config.learning_rate,
             lr_scheduler_type=config.lr_scheduler_type,
+            lr_scheduler_kwargs=config.lr_scheduler_kwargs,
             fp16 = not torch.cuda.is_bf16_supported(),
             bf16 = torch.cuda.is_bf16_supported(),
             logging_steps=config.logging_steps,
             optim="adamw_8bit",
             adam_beta1=0.9,
             adam_beta2=0.95,
-            adam_epsilon=0.00001,
+            adam_epsilon=1e-5,
             gradient_checkpointing=True,
             evaluation_strategy="steps" if val_data is not None else "no",
             save_strategy="steps",
@@ -127,7 +128,7 @@ def main(
         packing=False,
         max_seq_length=config.max_ctx_len,
         args=training_arguments,
-        data_collator=collator
+        data_collator=collator,
     )
     if config.checkpoint is not None:
         print(f'Starting from checkpoint: {config.checkpoint}')
@@ -136,7 +137,7 @@ def main(
     print('Finished training')
     # --- Save
     model.save_pretrained(config.output_dir)
-    tokenizer.save_pretrained(config.output_dir)
+    tokenizer.save_pretrained(os.path.join(config.output_dir, 'tokenizer'))
 
 def run():
     typer.run(main)
