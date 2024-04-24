@@ -19,9 +19,10 @@ def merge(
     
     # Do not load in 8-bit to be able to merge
     # Do not load on gpu to avoid OOM
-    model, tokenizer = get_model(adapter_path, load_in_4bit=False, device_map=None,
-                                 max_seq_length=config.max_ctx_len,
-            do_update_tokenizer=config.update_tokenizer)
+    model, tokenizer = get_model(
+        adapter_path, load_in_4bit=False, device_map=None,
+        max_seq_length=config.max_ctx_len,
+        loading_lora=True)
     print('Loaded model.')
     
     model.save_pretrained_merged(os.path.join(adapter_path, "merged"), tokenizer, save_method = "merged_16bit",)

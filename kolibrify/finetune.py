@@ -15,6 +15,7 @@ from unsloth import FastLanguageModel
 from .data_utils import load_dataset
 from .model_utils import get_model
 from .config import load_training_config
+from .data_collators import get_data_collator
 
 
 def main(
@@ -46,11 +47,10 @@ def main(
         task2 = progress.add_task(description="Loading model...", total=None)
         model, tokenizer = get_model(
             model_name=config.model, 
-            max_seq_length=config.max_ctx_len, 
-            do_update_tokenizer=config.update_tokenizer, 
+            max_seq_length=config.max_ctx_len,
             token=config.access_token,
             load_in_4bit=config.load_in_4bit,
-            resize_model_vocab=32001 if config.continued_training else None
+            add_imstart_token=config.add_imstart_token
         )
         import gc
         import torch
@@ -74,7 +74,8 @@ def main(
                 bias="none",
                 use_gradient_checkpointing=True,
                 max_seq_length=config.max_ctx_len,
-                random_state=322
+                random_state=322,
+                use_rslora=config.use_rslora
             )
         model.print_trainable_parameters()
         
@@ -107,14 +108,7 @@ def main(
             save_total_limit=config.save_total_limit,
             report_to="tensorboard"
         )
-        instruction_template = "<|im_start|>user"
-        response_template = "<|im_start|>assistant"
-        collator = DataCollatorForCompletionOnlyLM(
-            instruction_template=instruction_template, 
-            response_template=response_template, 
-            tokenizer=tokenizer, 
-            mlm=False
-        )
+        collator = get_data_collator(tokenizer, mask_assistant_responses=config.add_imstart_token)
         progress.advance(task3)
     
     # --- Start training

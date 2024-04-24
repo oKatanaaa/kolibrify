@@ -34,5 +34,5 @@ logging_steps: 5
 eval_steps: 50
 save_steps: 500
 save_total_limit: 8
-update_tokenizer: True
+add_imstart_token: True
 load_in_4bit: False

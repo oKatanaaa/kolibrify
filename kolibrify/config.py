@@ -7,12 +7,14 @@ from typing import List, Union, Optional
 class DatasetConfig:
     path: str
     n_samples: int = -1
-    
+
+
 @dataclass
 class StageConfig:
     name: str
     epochs: float
     datasets: List[DatasetConfig]
+
 
 @dataclass
 class TrainingConfig:
@@ -24,25 +26,26 @@ class TrainingConfig:
     output_dir: str = "experiments"
     val_dataset_file: Union[str, None] = None
     lora_r: int = 16
-    lora_alpha: int = 16
-    lora_dropout: int = 0.05
+    lora_alpha: int = 32
+    lora_dropout: int = 0
     lora_target_modules: List[str] = field(default_factory=lambda: ["q_proj", "v_proj"])
     modules_to_save: List[str] = field(default_factory=lambda: ["embed_tokens", "lm_head"])
+    use_rslora: bool = False
     micro_batch_size: int = 8
     gradient_accumulation_steps: int = 4
     max_grad_norm: float = 1.0
     learning_rate: float = 1e-5
     lr_scheduler_type: str = "linear"
     lr_scheduler_kwargs: Optional[dict] = None
-    warmup_steps: int = 100
+    warmup_steps: int = 0
     max_ctx_len: int = 2048
     logging_steps: int = 5
     eval_steps: int = 60
     save_steps: int = 60
     save_total_limit: int = 3
-    update_tokenizer: bool = False
+    add_imstart_token: bool = True
     load_in_4bit: bool = True
-    
+
 
 def load_stage_configs(stage_dicts: list) -> List[StageConfig]:
     stages = []
@@ -66,7 +69,6 @@ def load_stage_configs(stage_dicts: list) -> List[StageConfig]:
         stage = StageConfig(stage_name, epochs, dataset_configs)
         stages.append(stage)
     return stages
-        
 
 
 def load_training_config(config_path) -> tuple[dict, TrainingConfig]:
@@ -86,6 +88,13 @@ def load_training_config(config_path) -> tuple[dict, TrainingConfig]:
 
     stages = load_stage_configs(_config['stages'])
     _config['stages'] = stages
+    
+    training_config = TrainingConfig(**_config)
+    
+    if training_config.add_imstart_token:
+        assert 'embed_tokens' in training_config.modules_to_save and 'lm_head' in training_config.modules_to_save, \
+            "add_imstart_token=True, but you don't train embed_tokens and lm_head. Set modules_to_save to [\"embed_tokens\", \"lm_head\"]"
+            
     return config, TrainingConfig(**_config)
 
 

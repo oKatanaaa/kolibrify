@@ -8,12 +8,15 @@ from peft import PeftConfig
 def get_model(
     model_name, load_in_4bit=True, 
     max_seq_length=4096, device_map='auto', 
-    do_update_tokenizer=False, token=None, resize_model_vocab=None
+    add_imstart_token=False, token=None, loading_lora=False
 ):
-    #if resize_model_vocab is not None:
-    # peft_config = PeftConfig.from_pretrained(model_name, token = token)
-    # _model_name = peft_config.base_model_name_or_path
-    if resize_model_vocab is None:
+    resize_model_vocab = None
+    if loading_lora and add_imstart_token:
+        peft_config = PeftConfig.from_pretrained(model_name, token = token)
+        _model_name = peft_config.base_model_name_or_path
+        _tokenizer = Tokenizer.from_pretrained(_model_name)
+        resize_model_vocab = _tokenizer.get_vocab_size() + 1
+    elif add_imstart_token:
         _tokenizer = Tokenizer.from_pretrained(model_name)
         resize_model_vocab = _tokenizer.get_vocab_size() + 1
         
@@ -25,18 +28,19 @@ def get_model(
         token=token,
         resize_model_vocab=resize_model_vocab
     )
-    tokenizer = update_tokenizer(tokenizer)
-    # if resize_model_vocab is None:
-    #     model.resize_token_embeddings(len(tokenizer))
+    
+    tokenizer = update_tokenizer(tokenizer, add_imstart_token)
     return model, tokenizer
 
 
-def update_tokenizer(tokenizer):
-    tokenizer.add_special_tokens({'additional_special_tokens': ['<|im_start|>']})
+def update_tokenizer(tokenizer, add_imstart_token):
+    if add_imstart_token:
+        tokenizer.add_special_tokens({'additional_special_tokens': ['<|im_start|>']})
+    
     tokenizer = get_chat_template(
         tokenizer,
         chat_template="chatml",
         map_eos_token=True
     )
-    print(f'Updated tokenizer. New vocab len: {len(tokenizer)}')
+    print(f'Updated tokenizer. Vocab len: {len(tokenizer)}')
     return tokenizer
