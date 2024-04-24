@@ -29,7 +29,7 @@ class TrainingConfig:
     lora_alpha: int = 32
     lora_dropout: int = 0
     lora_target_modules: List[str] = field(default_factory=lambda: ["q_proj", "v_proj"])
-    modules_to_save: List[str] = field(default_factory=lambda: ["embed_tokens", "lm_head"])
+    modules_to_save: Optional[List[str]] = None
     use_rslora: bool = False
     micro_batch_size: int = 8
     gradient_accumulation_steps: int = 4
