@@ -45,6 +45,10 @@ The model will be saved in the `merged` folder where your adapter was saved.
 > [!NOTE]
 > If possible, kindly provide the kolibrify config you used in your model's repo so that others can reproduce your results.
 
+> [!NOTE]
+> See `examples` folder for a full example of finetuning Mistral model with Kolibrify on Dolphin dataset.
+
+
 ## Configuration
 
 See `training_config_template.yaml` for a comprehensive list of adjustable parameters tailored to your training and fine-tuning needs. This includes model identifiers, dataset paths, LoRA parameters, training iterations, learning rate, and more, providing a flexible foundation for model adaptation.
