@@ -1,4 +1,4 @@
-# Kolibrify README
+# Kolibrify
 
 ## Overview
 
