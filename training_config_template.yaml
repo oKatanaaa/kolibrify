@@ -8,7 +8,7 @@ stages:
       datasets: 
         - dataset1:
             path: path to dataset 1
-            n_samples: 800 # Must be not greater than total number of samples
+            n_samples: 800 # Must not be greater than total number of samples
         - dataset2: path to dataset 2 #All samples will be used
   - stage2:
       epochs: 0.5

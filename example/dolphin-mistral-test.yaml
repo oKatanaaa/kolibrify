@@ -1,0 +1,35 @@
+model: "unsloth/mistral-7b-instruct-v0.1-bnb-4bit"
+continued_training: False
+access_token: null
+output_dir: "dolphin-mistral-test"
+stages:
+  - gpt3:
+      epochs: 2
+      datasets:
+        - dolphin_gpt3: "dolphin_gpt3_small.jsonl"
+  - gpt4:
+      epochs: 2
+      datasets:
+        - dolphin_gpt4: "dolphin_gpt4_small.jsonl"
+val_dataset_file: null
+lora_r: 32
+lora_alpha: 64
+lora_dropout: 0 # Any is okay, but 0 is optimized in unsloth
+lora_target_modules: ["q_proj", "k_proj", "v_proj", "o_proj",
+                      "gate_proj", "up_proj", "down_proj"]
+modules_to_save: ["embed_tokens", "lm_head"]
+micro_batch_size: 2
+gradient_accumulation_steps: 4
+max_grad_norm: 2.0
+learning_rate: 0.00003
+lr_scheduler_type: "cosine_with_restarts"
+lr_scheduler_kwargs:
+  num_cycles: 2
+warmup_steps: 25
+max_ctx_len: 8192
+logging_steps: 1
+eval_steps: 50
+save_steps: 125 # Save intermediate checkpoints
+save_total_limit: 8
+add_imstart_token: True # Update the model vocab by adding <|im_start|> token
+load_in_4bit: True
