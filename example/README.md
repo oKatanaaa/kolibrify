@@ -15,7 +15,7 @@ Follow these steps to get started:
 5. You're all set! The model is now ready for use.
 
 > [!NOTE]
-> During the merging process in step 4, kolibrify integrates adapters into a 16fp model rather than a 4bit unquantized one, as this has shown to enhance performance downstream. This is the default merging method for any model.
+> During the merging process in step 4, kolibrify integrates adapters into a 16fp model rather than a 4bit unquantized one, as I found it to enhance downstream performance. This is the default merging method for any model.
 
 ### Explanation of Parameters
 

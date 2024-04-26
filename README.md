@@ -2,12 +2,19 @@
 
 ## Overview
 
-Kolibrify is a lightweight 'library' designed for curriculum and general fine-tuning of large language models (LLMs) for instruction following. Building on the premise of ChatML format, popularized by OpenAI, it allows for easy compatibility with existing serving frameworks. Key features include support for LoRA/QLoRA fine-tuning, datasets mixing and multi-stage continual training. Kolibrify aims to streamline the process of adapting LLMs to specific tasks or datasets employing curriculum learning for best results.
+Kolibrify is a lightweight 'library' (just a couple of simple scripts) designed for curriculum and general fine-tuning of large language models (LLMs) for instruction following. Building on the premise of ChatML format, popularized by OpenAI, it allows for easy compatibility with existing serving frameworks. Key features include support for LoRA/QLoRA fine-tuning, datasets mixing and multi-stage continual training. Kolibrify aims to streamline the process of adapting LLMs to specific tasks or datasets employing curriculum learning for best results.
 
 Kolibrify leverages the power of [Unsloth](https://github.com/unslothai/unsloth) for accelerated model training and reduced memory usage, making it a practical choice for developers looking to fine-tune LLMs with limited compute.
 
 > [!NOTE]
-> This project is essentially a supporting foundation for my research in curriculum learning. It is stiff in a sense that it does not load datasets from huggingface directly, but loads them from local files. So you will have to download datasets and save them on your machine to be able to use kolibrify. I made it this way to support rapid prototyping (I do frequent data processing and having to push datasets to hub slows the progress). It also assumes ChatML template by default, although I do plan to add support for other templates in the near future.
+> This project serves as a foundation for my research on curriculum learning. It has a unique setup in that it doesn't directly load datasets from Hugging Face, instead relying on local files. As a result, you'll need to download the datasets and save them on your machine to use Kolibrify. I designed it this way to facilitate rapid prototyping, as frequent data processing and pushing datasets to the hub slows down progress. By default, it assumes the use of the ChatML template, although I plan to add support for other templates in the near future.
+
+## Installation
+
+1. `git clone https://github.com/oKatanaaa/kolibrify`
+2. `cd kolibrify`
+3. `pip install -e .`
+4. Done!
 
 ## Usage
 
