@@ -16,6 +16,9 @@ Kolibrify leverages the power of [Unsloth](https://github.com/unslothai/unsloth)
 3. `pip install -e .`
 4. Done!
 
+> [!WARNING]
+> At the momemt you have to install unsloth from the nightly branch.
+
 ## Usage
 
 Kolibrify is equipped with two primary scripts for training and merging fine-tuned models: `kolibrify-train` and `kolibrify-merge`. To run those you have to make a YAML configuration file based on the `training_config_template.yaml`, tailored to your project's needs.
