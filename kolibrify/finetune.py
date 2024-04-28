@@ -67,7 +67,7 @@ def main(
                 modules_to_save=config.modules_to_save,
                 lora_dropout=config.lora_dropout,
                 bias="none",
-                use_gradient_checkpointing=True,
+                use_gradient_checkpointing="unsloth",
                 max_seq_length=config.max_ctx_len,
                 random_state=322,
                 use_rslora=config.use_rslora
@@ -99,7 +99,7 @@ def main(
             adam_beta1=0.9,
             adam_beta2=0.95,
             adam_epsilon=1e-5,
-            gradient_checkpointing="unsloth",
+            gradient_checkpointing=True,
             evaluation_strategy="steps" if val_data is not None else "no",
             save_strategy="steps",
             eval_steps=config.eval_steps,
