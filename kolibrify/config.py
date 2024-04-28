@@ -45,6 +45,7 @@ class TrainingConfig:
     save_total_limit: int = 3
     add_imstart_token: bool = True
     load_in_4bit: bool = True
+    cpu_offload_embeddings: bool = False
 
 
 def load_stage_configs(stage_dicts: list) -> List[StageConfig]:

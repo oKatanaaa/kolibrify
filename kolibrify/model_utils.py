@@ -3,6 +3,14 @@ from unsloth.chat_templates import get_chat_template
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from tokenizers import Tokenizer
 from peft import PeftConfig
+import gc
+import torch
+
+from .config import TrainingConfig
+
+def free_mem():
+    gc.collect()
+    torch.cuda.empty_cache()
 
 
 def get_model(
@@ -44,3 +52,36 @@ def update_tokenizer(tokenizer, add_imstart_token):
     )
     print(f'Updated tokenizer. Vocab len: {len(tokenizer)}')
     return tokenizer
+
+
+def to_cuda_wrapper(method):
+    def fn(indices):
+        tensor = method(indices.cpu())
+        return tensor.cuda()
+    return fn
+
+
+def cpu_offload_embeddings(lora_model, config: TrainingConfig):
+    # [NOTE] Trainable embeddings and lm_head won't be offloaded since it is not 
+    # compatible with 8bit optimizers
+    
+    # Offload the new embedding layer that is used during training
+    # lora_model.base_model.model.model.embed_tokens.modules_to_save.default = \
+    #    lora_model.base_model.model.model.embed_tokens.modules_to_save.default.cpu()
+    # lora_model.base_model.model.model.embed_tokens.modules_to_save.default.forward = \
+    #    to_cuda_wrapper(lora_model.base_model.model.model.embed_tokens.modules_to_save.default.forward)
+    
+    # Offload the original embedding layer
+    if 'embed_tokens' in config.modules_to_save:
+        print('Offloaded embed_tokens to CPU.')
+        lora_model.base_model.model.model.embed_tokens.original_module = \
+            lora_model.base_model.model.model.embed_tokens.original_module.cpu()
+    if 'lm_head' in config.modules_to_save:
+        print('Offloaded lm_head to CPU.')
+        lora_model.base_model.model.lm_head.original_module = \
+            lora_model.base_model.model.lm_head.original_module.cpu()
+    
+    if config.modules_to_save == [] or config.modules_to_save is None:
+        print('Nothing to offload.')
+    
+    

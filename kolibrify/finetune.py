@@ -13,7 +13,7 @@ import transformers
 from trl import SFTTrainer, DataCollatorForCompletionOnlyLM
 from unsloth import FastLanguageModel
 from .data_utils import load_dataset
-from .model_utils import get_model
+from .model_utils import get_model, free_mem, cpu_offload_embeddings
 from .config import load_training_config
 from .data_collators import get_data_collator
 
@@ -52,12 +52,7 @@ def main(
             load_in_4bit=config.load_in_4bit,
             add_imstart_token=config.add_imstart_token
         )
-        import gc
-        import torch
-
-        def free_mem():
-            gc.collect()
-            torch.cuda.empty_cache()
+        
         free_mem()
         progress.advance(task2)
     
@@ -77,6 +72,11 @@ def main(
                 random_state=322,
                 use_rslora=config.use_rslora
             )
+            
+            if config.cpu_offload_embeddings:
+                cpu_offload_embeddings(model, config)
+                free_mem()
+                
         model.print_trainable_parameters()
         
         total_batch_size = config.micro_batch_size * config.gradient_accumulation_steps
@@ -99,7 +99,7 @@ def main(
             adam_beta1=0.9,
             adam_beta2=0.95,
             adam_epsilon=1e-5,
-            gradient_checkpointing=True,
+            gradient_checkpointing="unsloth",
             evaluation_strategy="steps" if val_data is not None else "no",
             save_strategy="steps",
             eval_steps=config.eval_steps,
