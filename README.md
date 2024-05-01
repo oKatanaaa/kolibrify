@@ -25,20 +25,20 @@ Kolibrify is equipped with two primary scripts for training and merging fine-tun
 To start training, ensure your dataset is in the JSONL format specified, with records like `{"messages": [{"role": "role", "content": "content"}]}`. Adjust `training_config.yaml` as necessary, specifying model and dataset paths among other parameters.
 
 ```bash
-kolibrify-train --config_path training_config.yaml
+kolibrify-train training_config.yaml
 ```
 
-- `--config_path`: Path to your training configuration file, detailing model specifications, dataset locations, and training parameters.
+- `training_config.yaml`: Path to your training configuration file, detailing model specifications, dataset locations, and training parameters.
 
 ### Merging LoRA Parameters
 
 After training, use the merge script to incorporate the fine-tuned LoRA parameters back into the base model. This step is necessary for deploying your fine-tuned model with vLLM (and other serving frameworks).
 
 ```bash
-kolibrify-merge --config_path training_config.yaml
+kolibrify-merge training_config.yaml
 ```
 
-- `--config_path`: Path to your training configuration file used during the fine-tuning process.
+- `training_config.yaml`: Path to your training configuration file used during the fine-tuning process.
 
 The model will be saved in the `merged` folder where your adapter was saved.
 
