@@ -35,13 +35,12 @@ classifiers = [
 version = {attr = "kolibrify.__version__"}
 
 [project.urls]
-Homepage = "https://example.com"
-Documentation = "https://readthedocs.org"
-Repository = "https://github.com/me/spam.git"
-"Bug Tracker" = "https://github.com/me/spam/issues"
-Changelog = "https://github.com/me/spam/blob/master/CHANGELOG.md"
+Homepage = "https://github.com/oKatanaaa/kolibrify"
+Repository = "https://github.com/oKatanaaa/kolibrify"
+"Bug Tracker" = "https://github.com/oKatanaaa/kolibrify/issues"
 
 [project.scripts]
 kolibrify-train = "kolibrify.finetune:run"
 kolibrify-merge = "kolibrify.merge_lora:run"
 kolibrify-push = "kolibrify.push_to_hub:run"
+kolibrify-predict = "kolibrify.predict:run"
