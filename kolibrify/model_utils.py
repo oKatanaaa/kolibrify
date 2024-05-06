@@ -1,12 +1,12 @@
+from tokenizers import Tokenizer
 from unsloth import FastLanguageModel
 from unsloth.chat_templates import get_chat_template
-from transformers import AutoModelForCausalLM, AutoTokenizer
-from tokenizers import Tokenizer
 from peft import PeftConfig
 import gc
 import torch
 
 from .config import TrainingConfig
+
 
 def free_mem():
     gc.collect()

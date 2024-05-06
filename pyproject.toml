@@ -44,3 +44,4 @@ Changelog = "https://github.com/me/spam/blob/master/CHANGELOG.md"
 [project.scripts]
 kolibrify-train = "kolibrify.finetune:run"
 kolibrify-merge = "kolibrify.merge_lora:run"
+kolibrify-push = "kolibrify.push_to_hub:run"
