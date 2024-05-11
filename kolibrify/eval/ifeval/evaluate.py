@@ -4,7 +4,7 @@ import typer
 import os
 from typing_extensions import Annotated
 
-from kolibrify.predict import predict
+from kolibrify.inference import load_model, predict
 from kolibrify.config import load_training_config
 
 
@@ -55,26 +55,25 @@ def main(
     type: Annotated[str, typer.Option()] = 'last',
     temp: Annotated[float, typer.Option()] = 0,
     top_p: Annotated[float, typer.Option()] = 0.95,
-    max_output_tokens: Annotated[int, typer.Option()] = 4096
+    max_output_tokens: Annotated[int, typer.Option()] = 4096,
+    gpus: Annotated[str, typer.Option()] = '0'
 ):
     _, config = load_training_config(config_path)
+    model = load_model(config, backend, temp, top_p, max_output_tokens, gpus)
     assert os.path.exists(os.path.join(config.output_dir, "merged")), "The model must be merged but is not."
     assert eval_lang in ['en', 'ru'], f"Only 'ru' and 'en' are supported, but got {eval_lang}."
     if eval_lang == 'en':
         eval_file_path = EN_EVAL_PATH
     else:
         eval_file_path = RU_EVAL_PATH
-        
+    
     conversations = load_eval_data(eval_file_path)
     conversations = predict(
-        config=config,
+        model=model,
         conversations=conversations,
-        backend=backend,
-        type=type,
-        temp=temp,
-        top_p=top_p,
-        max_output_tokens=max_output_tokens
+        type=type
     )
+    model.finalize()
     
     output_save_path = os.path.join(config.output_dir, eval_lang + '_ifeval_results')
     os.makedirs(output_save_path, exist_ok=True)
