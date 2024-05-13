@@ -16,9 +16,6 @@ Kolibrify leverages the power of [Unsloth](https://github.com/unslothai/unsloth)
 3. `pip install -e .`
 4. Done!
 
-> [!WARNING]
-> At the momemt you have to install unsloth from the nightly branch.
-
 ## Usage
 
 Kolibrify is equipped with four primary scripts for training and merging fine-tuned models: 
@@ -33,10 +30,10 @@ To run those you have to make a YAML configuration file based on the `training_c
 To start training, ensure your dataset is in the JSONL format specified, with records like `{"messages": [{"role": "role", "content": "content"}]}`. Adjust `training_config.yaml` as necessary, specifying model and dataset paths among other parameters.
 
 ```bash
-kolibrify-train --config_path training_config.yaml
+kolibrify-train training_config.yaml
 ```
 
-- `--config_path`: Path to your training configuration file, detailing model specifications, dataset locations, and training parameters.
+- `training_config.yaml`: Path to your training configuration file, detailing model specifications, dataset locations, and training parameters.
 
 > [!NOTE]
 > See `examples` folder for a full example of finetuning Mistral model with Kolibrify on Dolphin dataset.
@@ -46,10 +43,10 @@ kolibrify-train --config_path training_config.yaml
 After training, use the merge script to incorporate the fine-tuned LoRA parameters back into the base model. This step is necessary for deploying your fine-tuned model with vLLM (and other serving frameworks).
 
 ```bash
-kolibrify-merge --config_path training_config.yaml
+kolibrify-merge training_config.yaml
 ```
 
-- `--config_path`: Path to your training configuration file used during the fine-tuning process.
+- `training_config.yaml`: Path to your training configuration file used during the fine-tuning process.
 
 The model will be saved in the `merged` folder where your adapter was saved.
 
