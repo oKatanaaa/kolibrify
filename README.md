@@ -18,7 +18,14 @@ Kolibrify leverages the power of [Unsloth](https://github.com/unslothai/unsloth)
 
 ## Usage
 
-Kolibrify is equipped with two primary scripts for training and merging fine-tuned models: `kolibrify-train` and `kolibrify-merge`. To run those you have to make a YAML configuration file based on the `training_config_template.yaml`, tailored to your project's needs.
+Kolibrify is equipped with four primary scripts for training, merging and testing fine-tuned models: 
+- `kolibrify-train` - finetuning.
+- `kolibrify-merge` - merging lora adapters.
+- `kolibrify-predict` - generating predictions using a finetuned model.
+- `kolibrify-eval-ifeval` - evaluating a finetuned model using instruction-following eval.
+To run those you have to make a YAML configuration file based on the `training_config_template.yaml`, tailored to your project's needs.
+
+Below is a brief rundown regarding each command. See the `examples` folder for detailed explanations.
 
 ### Training
 
@@ -29,6 +36,9 @@ kolibrify-train training_config.yaml
 ```
 
 - `training_config.yaml`: Path to your training configuration file, detailing model specifications, dataset locations, and training parameters.
+
+> [!NOTE]
+> See `examples` folder for a full example of finetuning Mistral model with Kolibrify on Dolphin dataset.
 
 ### Merging LoRA Parameters
 
@@ -42,12 +52,32 @@ kolibrify-merge training_config.yaml
 
 The model will be saved in the `merged` folder where your adapter was saved.
 
-> [!NOTE]
-> If possible, kindly provide the kolibrify config you used in your model's repo so that others can reproduce your results.
+### Prediction
 
-> [!NOTE]
-> See `examples` folder for a full example of finetuning Mistral model with Kolibrify on Dolphin dataset.
+For generating predictions with a fine-tuned model, use `kolibrify-predict`. Specify the path to your configuration, input dataset, and output location for the results:
 
+```bash
+kolibrify-predict config.yaml /path/to/dataset /path/to/output --gpus 1,2,3
+```
+
+- `config.yaml`: Configuration file used during model training.
+- `/path/to/dataset`: Can be a path to a JSONL file or a directory containing multiple JSONL files.
+- `/path/to/output`: Output path for saving the model's predictions. If `/path/to/dataset` is a JSONL file, `/path/to/output` must be a JSONL as well. The same goes for a path to a folder with datasets.
+- `--gpus`: Comma-separated GPU indices to use for the evaluation.
+
+### Evaluation
+
+For instruction following evaluation, use `kolibrify-eval-ifeval`. It allows evaluating the model's performance in following instructions in either English or Russian:
+
+```bash
+kolibrify-eval-ifeval config.yaml --eval-lang en --gpus 1,2,3
+```
+
+- `config.yaml`: Configuration file specifying paths and model details.
+- `--eval-lang`: Language for the evaluation (`en` for English, `ru` for Russian).
+- `--gpus`: Comma-separated GPU indices to use for the evaluation.
+
+This script will evaluate the model using the Instruction-Following Eval benchmark and save results and logs to the specified output directories.
 
 ## Configuration
 
@@ -55,6 +85,9 @@ See `training_config_template.yaml` for a comprehensive list of adjustable param
 
 > [!NOTE]
 > This project is in early development stages and will be updated frequently. If you encounter bugs or would like it to support some specific features, kindly make a corresponding issue. Contributions are welcome.
+
+> [!NOTE]
+> If possible, kindly provide the kolibrify config you used in your model's repo so that others can reproduce your results.
 
 ## Acknowledgements
 
