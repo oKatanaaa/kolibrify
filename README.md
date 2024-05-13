@@ -18,12 +18,14 @@ Kolibrify leverages the power of [Unsloth](https://github.com/unslothai/unsloth)
 
 ## Usage
 
-Kolibrify is equipped with four primary scripts for training and merging fine-tuned models: 
+Kolibrify is equipped with four primary scripts for training, merging and testing fine-tuned models: 
 - `kolibrify-train` - finetuning.
 - `kolibrify-merge` - merging lora adapters.
 - `kolibrify-predict` - generating predictions using a finetuned model.
 - `kolibrify-eval-ifeval` - evaluating a finetuned model using instruction-following eval.
 To run those you have to make a YAML configuration file based on the `training_config_template.yaml`, tailored to your project's needs.
+
+Below is a brief rundown regarding each command. See the `examples` folder for detailed explanations.
 
 ### Training
 
@@ -61,6 +63,7 @@ kolibrify-predict config.yaml /path/to/dataset /path/to/output --gpus 1,2,3
 - `config.yaml`: Configuration file used during model training.
 - `/path/to/dataset`: Can be a path to a JSONL file or a directory containing multiple JSONL files.
 - `/path/to/output`: Output path for saving the model's predictions. If `/path/to/dataset` is a JSONL file, `/path/to/output` must be a JSONL as well. The same goes for a path to a folder with datasets.
+- `--gpus`: Comma-separated GPU indices to use for the evaluation.
 
 ### Evaluation
 

@@ -20,8 +20,6 @@ To evaluate the model, follow these steps:
 
 ### Explanation of Command Parameters
 
-Here's a detailed explanation of the parameters used in the `kolibrify-eval-ifeval` command:
-
 - `config_path`: Path to the configuration file (`config.yaml`), which contains model settings.
 - `eval_lang`: Language of the evaluation dataset (`en` for English, `ru` for Russian). Default is `en`.
 - `backend` (optional): Backend used for model inference. Default is `vllm`.
@@ -33,7 +31,7 @@ Here's a detailed explanation of the parameters used in the `kolibrify-eval-ifev
 
 ### Output
 
-The evaluation script will save the evaluation results into the model's folder (specified as `output_dir` in the config):
+The evaluation script will save the evaluation results into the model's folder (specified as `output_dir` in the config) by creating  a separate subfolder containing eval results:
 - `en_ifeval_results` if English was selected.
 - `ru_ifeval_results` if Russian was selected.
 

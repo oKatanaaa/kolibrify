@@ -27,7 +27,7 @@ Here's an explanation of the parameters used in the `kolibrify-predict` command:
 - `temp` (optional): Specifies the temperature for sampling. Default is `0`.
 - `top_p` (optional): Specifies the top cumulative probability to sample from. Default is `0.95`.
 - `max_output_tokens` (optional): Specifies the maximum number of tokens in the output. Default is `4096`.
-- `gpus` (optional): Specifies which GPUs to use for data-parallel inference. Default is `0`.
+- `gpus` (optional): Comma separated GPU ids to use for data-parallel inference. Default is `0`.
 
 > [!NOTE]
 > vLLM will use ctx_len from the config as maximum context lenght.
