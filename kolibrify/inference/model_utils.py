@@ -1,7 +1,7 @@
 import os
 from copy import deepcopy
 
-from kolibrify.config import TrainingConfig
+from kolibrify.sft.config import TrainingConfig
 from .vllm_model import VllmModel, VllmModelDistributed
 
 

@@ -4,7 +4,7 @@ import copy
 import json
 from typing import List
 
-from .config import StageConfig, DatasetConfig
+from .sft.config import StageConfig, DatasetConfig
 
 class CurriculumDataGen:
     def __init__(self, simple_data_gens):

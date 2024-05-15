@@ -3,7 +3,7 @@ import multiprocessing
 from multiprocessing import Queue
 import os
 
-from kolibrify.config import TrainingConfig
+from kolibrify.sft.config import TrainingConfig
 from kolibrify.data_utils import format_chatml
 
 

@@ -1,13 +1,12 @@
+import os
+# Required to run the script
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+
 import typer
 from typing_extensions import Annotated
-from peft import PeftModel
-import os
-
-
-from copy import deepcopy
 from glob import glob
 
-from kolibrify.config import load_training_config
+from kolibrify.sft.config import load_training_config
 from kolibrify.inference import (
     load_model, load_dataset, save_dataset, predict
 )

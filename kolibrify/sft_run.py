@@ -14,7 +14,7 @@ from trl import SFTTrainer, DataCollatorForCompletionOnlyLM
 from unsloth import FastLanguageModel
 from .data_utils import load_dataset
 from .model_utils import get_model, free_mem, cpu_offload_embeddings
-from .config import load_training_config
+from .sft import load_training_config
 from .data_collators import get_data_collator
 
 

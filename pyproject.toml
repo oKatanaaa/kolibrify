@@ -40,7 +40,8 @@ Repository = "https://github.com/oKatanaaa/kolibrify"
 "Bug Tracker" = "https://github.com/oKatanaaa/kolibrify/issues"
 
 [project.scripts]
-kolibrify-train = "kolibrify.finetune:run"
+kolibrify-sft = "kolibrify.sft_run:run"
+kolibrify-dpo = "kolibrify.dpo_run:run"
 kolibrify-merge = "kolibrify.merge_lora:run"
 kolibrify-push = "kolibrify.push_to_hub:run"
 kolibrify-predict = "kolibrify.predict:run"

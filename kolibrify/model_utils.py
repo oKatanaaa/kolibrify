@@ -5,7 +5,7 @@ from peft import PeftConfig
 import gc
 import torch
 
-from .config import TrainingConfig
+from .core.config import BaseConfig
 
 
 def free_mem():
@@ -61,7 +61,7 @@ def to_cuda_wrapper(method):
     return fn
 
 
-def cpu_offload_embeddings(lora_model, config: TrainingConfig):
+def cpu_offload_embeddings(lora_model, config: BaseConfig):
     # [NOTE] Trainable embeddings and lm_head won't be offloaded since it is not 
     # compatible with 8bit optimizers
     
