@@ -36,24 +36,26 @@ def main(
         transient=True,
     ) as progress:
         # --- Load datasets and model
-        task1 = progress.add_task(description="Loading dataset...", total=None)
-        train_data, val_data, data_iterations = load_dataset(
-            stages=config.stages, 
-            val_dataset_path=config.val_dataset_file
-        )
-        progress.print('Total data iterations:', data_iterations)
-        progress.advance(task1)
-        
-        task2 = progress.add_task(description="Loading model...", total=None)
+        task1 = progress.add_task(description="Loading model...", total=None)
         model, tokenizer = get_model(
             model_name=config.model, 
             max_seq_length=config.max_ctx_len,
             token=config.access_token,
             load_in_4bit=config.load_in_4bit,
-            add_imstart_token=config.add_imstart_token
+            add_imstart_token=config.add_imstart_token,
+            map_eos=config.map_imend_to_eos
         )
-        
         free_mem()
+        progress.advance(task1)
+
+        task2 = progress.add_task(description="Loading dataset...", total=None)
+        train_data, val_data, data_iterations = load_dataset(
+            stages=config.stages, 
+            val_dataset_path=config.val_dataset_file,
+            tokenizer=tokenizer,
+            config=config
+        )
+        progress.print('Total data iterations:', data_iterations)
         progress.advance(task2)
     
         # --- Setup all training stuff

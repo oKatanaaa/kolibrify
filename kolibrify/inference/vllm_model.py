@@ -3,14 +3,13 @@ import multiprocessing
 from multiprocessing import Queue
 import os
 
-from kolibrify.sft.config import TrainingConfig
-from kolibrify.data_utils import format_chatml
+from kolibrify.core.data_utils import ChatMLFormatter
 
 
 def format_prompts_vllm(messages):
     prompts = []
     for conv in messages:
-        prompt = format_chatml(conv)['prompt']
+        prompt = ChatMLFormatter.format_chatml(conv)
         # Add prefix for assistant response
         prompt += '\n<|im_start|>assistant\n'
         prompts.append(prompt)

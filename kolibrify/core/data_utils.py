@@ -1,6 +1,7 @@
 import random
 import copy
 import json
+from typing import List
 
 
 def load_jsonl(path):
@@ -46,3 +47,55 @@ class SimpleDataGen:
 
     def __call__(self):
         return self.__iter__()
+
+
+class ChatMLFormatter:
+    @staticmethod
+    def format_chatml(chat: list[dict[str, str]] = dict()) -> str:
+        """
+        Uses https://github.com/openai/openai-python/blob/main/chatml.md as chat format.
+        """
+        chat = chat['messages']
+        raw_chat_text = ""
+        for item in chat:
+            if len(raw_chat_text) > 0:
+                raw_chat_text += '\n'
+            role = item['role']
+            content = item['content']
+            raw_chat_text += f"<|im_start|>{role}\n{content}<|im_end|>"
+        return raw_chat_text
+    
+    def __init__(self, tokenizer, max_len):
+        self.tokenizer = tokenizer
+        self.max_len = max_len
+
+    def tokenize(self, prompt: str) -> List[str]:
+        result = self.tokenizer(
+            prompt,
+            truncation=True,
+            max_length=self.max_len,
+            padding=True
+        )
+        result["labels"] = result["input_ids"].copy()
+        return result
+    
+    def __call__(self, sample):
+        prompt = ChatMLFormatter.format_chatml(sample)
+        out_dict = self.tokenize(prompt)
+        out_dict['prompt'] = prompt
+        return out_dict
+    
+    def format_batched(self, samples):
+        _samples = []
+        for sample in samples['messages']:
+            _samples.append({'messages': sample})
+        prompts = [ChatMLFormatter.format_chatml(sample) for sample in _samples]
+        batched_dict = self.tokenize(prompts)
+        # out_dicts = []
+        # for i in range(len(prompts)):
+        #     input_ids = batched_dict['input_ids'][i]
+        #     labels = batched_dict['labels'][i]
+        #     out_dicts.append(
+        #         {'input_ids': input_ids, 'labels': labels, 'prompt': prompts[i]}
+        #     )
+        return batched_dict

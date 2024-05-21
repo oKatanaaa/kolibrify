@@ -50,7 +50,8 @@ def main(
             max_seq_length=config.max_ctx_len,
             token=config.access_token,
             load_in_4bit=config.load_in_4bit,
-            add_imstart_token=config.add_imstart_token
+            add_imstart_token=config.add_imstart_token,
+            map_eos=config.map_imend_to_eos
         )
         
         free_mem()

@@ -1,5 +1,6 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, _MISSING_TYPE
 from typing import List, Union, Optional
+import yaml
 
 
 @dataclass
@@ -29,5 +30,31 @@ class BaseConfig:
     save_steps: int = 60
     save_total_limit: int = 3
     add_imstart_token: bool = True
+    map_imend_to_eos: bool = True
     load_in_4bit: bool = True
     cpu_offload_embeddings: bool = False
+
+
+def load_base_config(config_path) -> tuple[dict, BaseConfig]:
+    with open(config_path) as f:
+        config = yaml.safe_load(f)
+    
+    _config = dict([(k, v) for k, v in config.items() if v is not None])
+    # Check data integrity
+    fields = BaseConfig.__dataclass_fields__
+    missing_keys = list(set(fields.keys()) - set(_config.keys()))
+    if len(missing_keys) > 0:
+        for k in missing_keys:
+            default_val = fields[k].default
+            if isinstance(default_val, _MISSING_TYPE):
+                default_val = fields[k].default_factory()
+            print(f'WARNING! Missing key: {k}. Setting to default value: {default_val}')
+    _config.pop('stages')
+    
+    training_config = BaseConfig(**_config)
+    
+    if training_config.add_imstart_token:
+        assert 'embed_tokens' in training_config.modules_to_save and 'lm_head' in training_config.modules_to_save, \
+            "add_imstart_token=True, but you don't train embed_tokens and lm_head. Set modules_to_save to [\"embed_tokens\", \"lm_head\"]"
+            
+    return config, training_config

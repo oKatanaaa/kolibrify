@@ -4,7 +4,7 @@ from peft import PeftModel
 import os
 
 from .model_utils import get_model
-from .config import load_training_config
+from .core import load_base_config
 
 
 def merge(
@@ -12,7 +12,7 @@ def merge(
     adapter_path: Annotated[str, typer.Option()] = None,
     base_model: Annotated[str, typer.Option()] = None
 ):
-    _, config = load_training_config(config_path)
+    _, config = load_base_config(config_path)
     
     if adapter_path is None:
         adapter_path = config.output_dir

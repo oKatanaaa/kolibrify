@@ -20,7 +20,7 @@ class StageConfig:
 
 @dataclass
 class TrainingConfig(BaseConfig):
-    stages: List[StageConfig]
+    stages: List[StageConfig] = field(default_factory=lambda: [])
 
 
 def load_stage_configs(stage_dicts: list) -> List[StageConfig]:

@@ -43,6 +43,7 @@ def load_jsonl_data(datasets: List[DatasetConfig], epochs: float):
     return SimpleDataGen(total_samples, epochs)
 
 
+# TODO: update curriculum sampling
 def load_dataset(stages: List[StageConfig], val_dataset_path=None, format_fn=None):
     if format_fn is None:
         format_fn = format_chatml
