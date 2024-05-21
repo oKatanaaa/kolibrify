@@ -13,21 +13,39 @@ def free_mem():
     torch.cuda.empty_cache()
 
 
-def get_model(
-    model_name, load_in_4bit=True, 
-    max_seq_length=4096, device_map='auto', 
-    add_imstart_token=False, token=None, loading_lora=False
-):
-    resize_model_vocab = None
-    if loading_lora and add_imstart_token:
+def get_source_vocab_size(model_name, loading_lora, token):
+    if loading_lora:
         peft_config = PeftConfig.from_pretrained(model_name, token = token)
         _model_name = peft_config.base_model_name_or_path
         _tokenizer = Tokenizer.from_pretrained(_model_name)
-        resize_model_vocab = _tokenizer.get_vocab_size() + 1
-    elif add_imstart_token:
-        _tokenizer = Tokenizer.from_pretrained(model_name)
-        resize_model_vocab = _tokenizer.get_vocab_size() + 1
-        
+        return _tokenizer.get_vocab_size()
+
+    _tokenizer = Tokenizer.from_pretrained(model_name)
+    return _tokenizer.get_vocab_size()
+
+
+def determine_new_vocab_size(model_name, token, loading_lora, add_imstart_token, map_eos):
+    basic_modifier = int(add_imstart_token) + int(not map_eos)
+    source_vocab_size = get_source_vocab_size(model_name, loading_lora, token)
+    print(f'Source vocab size: {source_vocab_size}')
+    resize_model_vocab = None
+    
+    if basic_modifier > 0:
+        resize_model_vocab = source_vocab_size + basic_modifier
+    
+    return resize_model_vocab
+
+
+def get_model(
+    model_name, load_in_4bit=True, 
+    max_seq_length=4096, device_map='auto', 
+    add_imstart_token=False, map_eos=True,
+    token=None, loading_lora=False
+):
+    resize_model_vocab = determine_new_vocab_size(
+        model_name, token, loading_lora, add_imstart_token, map_eos=map_eos
+    )
+    
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name=model_name,
         load_in_4bit=load_in_4bit,
@@ -37,19 +55,35 @@ def get_model(
         resize_model_vocab=resize_model_vocab
     )
     
-    tokenizer = update_tokenizer(tokenizer, add_imstart_token)
+    tokenizer = update_tokenizer(tokenizer, add_imstart_token, map_eos)
     return model, tokenizer
 
 
-def update_tokenizer(tokenizer, add_imstart_token):
+def update_tokenizer(tokenizer, add_imstart_token, map_eos):
     if add_imstart_token:
         tokenizer.add_special_tokens({'additional_special_tokens': ['<|im_start|>']})
     
+    if not map_eos:
+        print('Not mapping eos token, adding a new one.')
+        tokenizer.add_special_tokens({'eos_token': '<|im_end|>'})
+
+    # Make sure pad token is not the same as eos token
+    if tokenizer.pad_token_id == tokenizer.eos_token_id:
+        print('Pad token is the same as eos token.')
+        print('Updating pad token to unk token.')
+        tokenizer.pad_token_id = tokenizer.unk_token_id
+
+    if tokenizer.padding_side == 'left':
+        print('Padding side is left.')
+        print('Updating padding side to right.')
+        tokenizer.padding_side = 'right'
+
     tokenizer = get_chat_template(
         tokenizer,
         chat_template="chatml",
-        map_eos_token=True
+        map_eos_token=map_eos
     )
+
     print(f'Updated tokenizer. Vocab len: {len(tokenizer)}')
     return tokenizer
 
