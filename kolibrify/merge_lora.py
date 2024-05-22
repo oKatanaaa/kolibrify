@@ -22,7 +22,9 @@ def merge(
     model, tokenizer = get_model(
         adapter_path, load_in_4bit=False, device_map=None,
         max_seq_length=config.max_ctx_len,
-        loading_lora=True, add_imstart_token=config.add_imstart_token)
+        loading_lora=True, 
+        add_imstart_token=config.add_imstart_token,
+        map_eos=config.map_eos_to_imend)
     print('Loaded model.')
     
     model.save_pretrained_merged(os.path.join(adapter_path, "merged"), tokenizer, save_method = "merged_16bit",)

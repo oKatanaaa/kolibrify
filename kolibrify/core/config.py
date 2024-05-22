@@ -30,16 +30,16 @@ class BaseConfig:
     save_steps: int = 60
     save_total_limit: int = 3
     add_imstart_token: bool = True
-    map_imend_to_eos: bool = True
+    map_eos_to_imend: bool = True
     load_in_4bit: bool = True
     cpu_offload_embeddings: bool = False
 
 
 def load_base_config(config_path) -> tuple[dict, BaseConfig]:
     with open(config_path) as f:
-        config = yaml.safe_load(f)
+        config_dict = yaml.safe_load(f)
     
-    _config = dict([(k, v) for k, v in config.items() if v is not None])
+    _config = dict([(k, v) for k, v in config_dict.items() if v is not None])
     # Check data integrity
     fields = BaseConfig.__dataclass_fields__
     missing_keys = list(set(fields.keys()) - set(_config.keys()))
@@ -57,4 +57,4 @@ def load_base_config(config_path) -> tuple[dict, BaseConfig]:
         assert 'embed_tokens' in training_config.modules_to_save and 'lm_head' in training_config.modules_to_save, \
             "add_imstart_token=True, but you don't train embed_tokens and lm_head. Set modules_to_save to [\"embed_tokens\", \"lm_head\"]"
             
-    return config, training_config
+    return config_dict, training_config

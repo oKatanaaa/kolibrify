@@ -36,5 +36,6 @@ eval_steps: 50
 save_steps: 500
 save_total_limit: 8
 add_imstart_token: True
+map_eos_to_imend: True # Sometimes tokenizer does not work properly with *replaced* eos token, this is a workaround
 load_in_4bit: False
 cpu_offload_embeddings: True # Offload original embed_tokens and lm_head when they are in modules_to_save

@@ -1,4 +1,4 @@
-from tokenizers import Tokenizer
+from transformers import AutoTokenizer
 from unsloth import FastLanguageModel
 from unsloth.chat_templates import get_chat_template
 from peft import PeftConfig
@@ -17,11 +17,11 @@ def get_source_vocab_size(model_name, loading_lora, token):
     if loading_lora:
         peft_config = PeftConfig.from_pretrained(model_name, token = token)
         _model_name = peft_config.base_model_name_or_path
-        _tokenizer = Tokenizer.from_pretrained(_model_name)
-        return _tokenizer.get_vocab_size()
+        _tokenizer = AutoTokenizer.from_pretrained(_model_name, token = token)
+        return len(_tokenizer.get_vocab())
 
-    _tokenizer = Tokenizer.from_pretrained(model_name)
-    return _tokenizer.get_vocab_size()
+    _tokenizer = AutoTokenizer.from_pretrained(model_name, token = token)
+    return len(_tokenizer.get_vocab())
 
 
 def determine_new_vocab_size(model_name, token, loading_lora, add_imstart_token, map_eos):
@@ -56,6 +56,8 @@ def get_model(
     )
     
     tokenizer = update_tokenizer(tokenizer, add_imstart_token, map_eos)
+    _update_model_eos_id(model, tokenizer)
+
     return model, tokenizer
 
 
@@ -86,6 +88,11 @@ def update_tokenizer(tokenizer, add_imstart_token, map_eos):
 
     print(f'Updated tokenizer. Vocab len: {len(tokenizer)}')
     return tokenizer
+
+
+def _update_model_eos_id(model, tokenizer):
+    model.config.eos_token_id = tokenizer.get_vocab()['<|im_end|>']
+    model.generation_config.eos_token_id = tokenizer.get_vocab()['<|im_end|>']
 
 
 def to_cuda_wrapper(method):

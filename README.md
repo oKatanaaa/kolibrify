@@ -19,7 +19,8 @@ Kolibrify leverages the power of [Unsloth](https://github.com/unslothai/unsloth)
 ## Usage
 
 Kolibrify is equipped with four primary scripts for training, merging and testing fine-tuned models: 
-- `kolibrify-train` - finetuning.
+- `kolibrify-sft` - supervised finetuning.
+- `kolibrify-dpo` - DPO.
 - `kolibrify-merge` - merging lora adapters.
 - `kolibrify-predict` - generating predictions using a finetuned model.
 - `kolibrify-eval-ifeval` - evaluating a finetuned model using instruction-following eval.
