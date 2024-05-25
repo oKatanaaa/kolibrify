@@ -13,6 +13,7 @@ def free_mem():
     torch.cuda.empty_cache()
 
 
+# Simplify the shit belows
 def get_source_vocab_size(model_name, loading_lora, token):
     if loading_lora:
         peft_config = PeftConfig.from_pretrained(model_name, token = token)
@@ -24,8 +25,23 @@ def get_source_vocab_size(model_name, loading_lora, token):
     return len(_tokenizer.get_vocab())
 
 
+def vocab_has_imend(model_name, loading_lora, token):
+    if loading_lora:
+        peft_config = PeftConfig.from_pretrained(model_name, token = token)
+        _model_name = peft_config.base_model_name_or_path
+        _tokenizer = AutoTokenizer.from_pretrained(_model_name, token = token)
+        return '<|im_end|>' in _tokenizer.get_vocab()
+
+    _tokenizer = AutoTokenizer.from_pretrained(model_name, token = token)
+    return '<|im_end|>' in _tokenizer.get_vocab()
+
+
 def determine_new_vocab_size(model_name, token, loading_lora, add_imstart_token, map_eos):
-    basic_modifier = int(add_imstart_token) + int(not map_eos)
+    basic_modifier = int(add_imstart_token)
+
+    if not vocab_has_imend(model_name, loading_lora, token) and not map_eos:
+        basic_modifier += 1
+
     source_vocab_size = get_source_vocab_size(model_name, loading_lora, token)
     print(f'Source vocab size: {source_vocab_size}')
     resize_model_vocab = None
@@ -45,6 +61,10 @@ def get_model(
     resize_model_vocab = determine_new_vocab_size(
         model_name, token, loading_lora, add_imstart_token, map_eos=map_eos
     )
+    if resize_model_vocab is None:
+        print("Vocab won't be resized.")
+    else:
+        print("Model vocab will be resized to", resize_model_vocab)
     
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name=model_name,
@@ -62,12 +82,16 @@ def get_model(
 
 
 def update_tokenizer(tokenizer, add_imstart_token, map_eos):
+    print('map_eos', map_eos)
     if add_imstart_token:
         tokenizer.add_special_tokens({'additional_special_tokens': ['<|im_start|>']})
     
     if not map_eos:
         print('Not mapping eos token, adding a new one.')
-        tokenizer.add_special_tokens({'eos_token': '<|im_end|>'})
+        if tokenizer.get_vocab().get('<|im_end|>') is None:
+            tokenizer.add_special_tokens({'eos_token': '<|im_end|>'})
+        else:
+            print('Eos token already exists.')
 
     # Make sure pad token is not the same as eos token
     if tokenizer.pad_token_id == tokenizer.eos_token_id:

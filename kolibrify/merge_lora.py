@@ -9,13 +9,13 @@ from .core import load_base_config
 
 def merge(
     config_path: Annotated[str, typer.Argument()] = "training_config.yaml",
-    adapter_path: Annotated[str, typer.Option()] = None,
+    checkpoint: Annotated[str, typer.Option()] = None,
     base_model: Annotated[str, typer.Option()] = None
 ):
     _, config = load_base_config(config_path)
-    
-    if adapter_path is None:
-        adapter_path = config.output_dir
+    adapter_path = config.output_dir
+    if checkpoint is not None:
+        adapter_path = os.path.join(adapter_path, checkpoint)
     
     # Do not load in 8-bit to be able to merge
     # Do not load on gpu to avoid OOM
