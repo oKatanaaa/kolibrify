@@ -5,7 +5,7 @@ from peft import PeftConfig
 import gc
 import torch
 
-from .core.config import BaseConfig
+from .config import BaseConfig
 
 
 def free_mem():

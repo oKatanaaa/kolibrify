@@ -1,23 +1,21 @@
-model: "unsloth/mistral-7b-instruct-v0.1-bnb-4bit"
+model: "/workspace/recipe_research/models/sft-0423/merged"
 continued_training: False
 access_token: null
 output_dir: "dolphin-mistral-test"
 stages:
-  - gpt3:
-      epochs: 2
-      datasets:
-        - dolphin_gpt3: "dolphin_gpt3_small.jsonl"
   - gpt4:
-      epochs: 2
+      epochs: 0.1
       datasets:
-        - dolphin_gpt4: "dolphin_gpt4_small.jsonl"
+        - dolphin_gpt3: 
+            accepted: "dolphin_gpt4_small.jsonl"
+            rejected: "dolphin_gpt4_small_predictions.jsonl"
 val_dataset_file: null
 lora_r: 32
 lora_alpha: 64
 lora_dropout: 0 # Any is okay, but 0 is optimized in unsloth
 lora_target_modules: ["q_proj", "k_proj", "v_proj", "o_proj",
                       "gate_proj", "up_proj", "down_proj"]
-modules_to_save: ["embed_tokens", "lm_head"]
+modules_to_save:
 micro_batch_size: 2
 gradient_accumulation_steps: 4
 max_grad_norm: 2.0
@@ -31,5 +29,5 @@ logging_steps: 1
 eval_steps: 50
 save_steps: 125 # Save intermediate checkpoints
 save_total_limit: 8
-add_imstart_token: True # Update the model vocab by adding <|im_start|> token
+add_imstart_token: False # Update the model vocab by adding <|im_start|> token
 load_in_4bit: True

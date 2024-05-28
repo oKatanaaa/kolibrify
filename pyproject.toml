@@ -8,10 +8,15 @@ dynamic = ["version"]
 dependencies = [
   "datasets ~= 2.16.1",
   "rich ~= 13.7.0",
-  "typer ~= 0.9.0",
-  "transformers ~= 4.38.1",
+  "typer ~= 0.12.3",
+  "transformers ~= 4.41.1",
   "trl ~= 0.7.11",
-  "unsloth ~= 2024.2"
+  "unsloth ~= 2024.2",
+  "vllm ~= 0.4.2",
+  "langdetect ~= 1.0.9",
+  "nltk ~= 3.8.1",
+  "pymorphy2 ~= 0.9.1",
+  "immutabledict ~= 4.1.0"
 ]
 requires-python = ">=3.10"
 authors = [
@@ -23,7 +28,16 @@ maintainers = [
 description = "A small framework for curriculum training of LLMs"
 readme = "README.rst"
 license = {file = "LICENSE"}
-keywords = ["large language model", "finetuning", "llm finetuning", "gpt", "instruction following"]
+keywords = [
+  "large language model",
+  "finetuning", 
+  "llm finetuning", 
+  "gpt", 
+  "instruction following", 
+  "dpo",
+  "direct preference optimization",
+  "curriculum learning"
+]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Developers",

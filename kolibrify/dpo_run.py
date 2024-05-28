@@ -2,7 +2,6 @@ import typer
 from typing_extensions import Annotated
 from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
 import os
-import yaml
 
 import torch
 torch.manual_seed(0)
@@ -15,19 +14,18 @@ from unsloth import FastLanguageModel, PatchDPOTrainer
 PatchDPOTrainer()
 
 from .dpo import load_dataset, load_training_config
-from .model_utils import get_model, free_mem, cpu_offload_embeddings
+from .core import get_model, free_mem, cpu_offload_embeddings
+from .core import save_config
 
 
 def main(
     config_path: Annotated[str, typer.Argument()] = "training_config.yaml"
 ):
-    yaml_config, config = load_training_config(config_path)
+    config_dict, config = load_training_config(config_path)
     print(config)
     
     os.makedirs(config.output_dir, exist_ok=True)
-    with open(os.path.join(config.output_dir, 'kolibrify-config.yaml'), 'w') as f:
-        yaml.safe_dump(yaml_config, f, sort_keys=False)
-        print('Saved config in the output directory.')
+    save_config(config_dict)
     
     with Progress(
         SpinnerColumn(),

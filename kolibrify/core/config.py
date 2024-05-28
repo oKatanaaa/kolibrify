@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field, _MISSING_TYPE
 from typing import List, Union, Optional
 import yaml
+import os
 
 
 @dataclass
@@ -58,3 +59,12 @@ def load_base_config(config_path) -> tuple[dict, BaseConfig]:
             "add_imstart_token=True, but you don't train embed_tokens and lm_head. Set modules_to_save to [\"embed_tokens\", \"lm_head\"]"
             
     return config_dict, training_config
+
+
+def save_config(config_dict: dict):
+    output_dir = config_dict['output_dir']
+    # Remove token info
+    config_dict['access_token'] = None
+    with open(os.path.join(output_dir, 'kolibrify-config.yaml'), 'w') as f:
+        yaml.safe_dump(config_dict, f, sort_keys=False)
+        print('Saved config in the output directory.')

@@ -7,7 +7,7 @@ This example demonstrates how to fine-tune a model using kolibrify, incorporatin
 Follow these steps to get started:
 
 1. Navigate to the example directory with `cd`.
-2. Execute `kolibrify-train dolphin-mistral-test.yaml`.
+2. Execute `kolibrify-sft dolphin-mistral-test.yaml`.
    - If your system is equipped with multiple GPUs, use `CUDA_DEVICE_ORDER=PCI_BUS_ID CUDA_VISIBLE_DEVICES=0 kolibrify-sft dolphin-mistral-test.yaml`. Substitute `CUDA_VISIBLE_DEVICES` with the correct GPU ID if 0 is in use.
    - To run the training in the background, use `nohup CUDA_DEVICE_ORDER=PCI_BUS_ID CUDA_VISIBLE_DEVICES=0 kolibrify-sft dolphin-mistral-test.yaml > dolphin-mistral-test.log 2>&1 &`. This command logs all outputs to `dolphin-mistral-test.log` in the current directory.
 3. After training, load the model with unsloth as usual. Currently, kolibrify does not support uploading adapters directly to Hugging Face; you'll need to handle this step on your own.

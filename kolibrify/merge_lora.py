@@ -1,9 +1,8 @@
+import os
 import typer
 from typing_extensions import Annotated
-from peft import PeftModel
-import os
 
-from .model_utils import get_model
+from .core.model_utils import get_model
 from .core import load_base_config
 
 
