@@ -111,6 +111,7 @@ kolibrify-push config.yaml repo-name --quantize quant
 - `config.yaml`: Configuration file specifying paths and model details.
 - `repo-name`: Name of the Huggingface repo.
 - `--quantize`: Name of the quant to push (e.g. q8_0).
+- `--hf_token`: You Huggingface token. By default the token is taken from your config file.
 
 > [!NOTE]
 > Do not create the repo manually, it will be created automatically.

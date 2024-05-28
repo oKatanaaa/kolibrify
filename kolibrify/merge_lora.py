@@ -2,8 +2,7 @@ import os
 import typer
 from typing_extensions import Annotated
 
-from .core.model_utils import get_model
-from .core import load_base_config
+from .core import get_model, load_base_config
 
 
 def merge(

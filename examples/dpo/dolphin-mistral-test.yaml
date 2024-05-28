@@ -4,7 +4,7 @@ access_token: null
 output_dir: "dolphin-mistral-test"
 stages:
   - gpt4:
-      epochs: 0.1
+      epochs: 1
       datasets:
         - dolphin_gpt3: 
             accepted: "dolphin_gpt4_small.jsonl"

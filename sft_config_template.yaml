@@ -7,10 +7,9 @@ stages:
       epochs: 1.0
       datasets: 
         - dataset1:
-            accepted: path to dataset 1 accepted responses
-            rejected: path to dataset 1 rejected responses
+            path: path to dataset 1
             n_samples: 800 # Must not be greater than total number of samples
-        - dataset2: path to dataset 2 #All samples will be used
+        - dataset2: path to dataset 2 # All samples will be used
   - stage2:
       epochs: 0.5
       datasets:
