@@ -22,8 +22,8 @@ Here's an explanation of the parameters used in the `kolibrify-predict` command:
 - `config_path`: Specifies the path to the configuration file (`config.yaml`). This file contains settings for the model.
 - `dataset_path`: Specifies the path to the input dataset (`test.jsonl` or a directory containing multiple `.jsonl` files) containing samples for which predictions will be generated.
 - `dataset_save_path` (optional): Specifies the path to save the output predictions. If not provided, the default path is `output.jsonl`. Ensure it's a directory if the input is also a directory.
-- `backend` (optional): Specifies the backend to use for prediction. Default is `vllm`.
-- `type` (optional): Currently supports `last` type, though not all types are supported at the moment.
+- `backend` (optional): Specifies the backend to use for prediction. Default is `vllm`. Currently other backend are not implemented.
+- `type` (optional): Defaults to `last`, though this argument is ignored at the moment.
 - `temp` (optional): Specifies the temperature for sampling. Default is `0`.
 - `top_p` (optional): Specifies the top cumulative probability to sample from. Default is `0.95`.
 - `max_output_tokens` (optional): Specifies the maximum number of tokens in the output. Default is `4096`.

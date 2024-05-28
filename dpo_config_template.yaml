@@ -7,13 +7,18 @@ stages:
       epochs: 1.0
       datasets: 
         - dataset1:
-            path: path to dataset 1
+            accepted: path to accepted dataset 1
+            rejected: path to rejected dataset 1
             n_samples: 800 # Must not be greater than total number of samples
-        - dataset2: path to dataset 2 #All samples will be used
+        - dataset2: # All samples will be used
+            accepted: path to accepted dataset 2
+            rejected: path to rejected dataset 2 
   - stage2:
       epochs: 0.5
       datasets:
-        - dataset3: path to dataset 3
+      - dataset3: # All samples will be used
+          accepted: path to accepted dataset 3
+          rejected: path to rejected dataset 3 
 val_dataset_file: null
 lora_r: 64
 lora_alpha: 64
@@ -34,6 +39,7 @@ logging_steps: 5
 eval_steps: 50
 save_steps: 500
 save_total_limit: 8
-add_imstart_token: True
+add_imstart_token: False
+map_eos_to_imend: False # Sometimes tokenizer does not work properly with *replaced* eos token, this is a workaround
 load_in_4bit: False
 cpu_offload_embeddings: True # Offload original embed_tokens and lm_head when they are in modules_to_save

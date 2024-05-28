@@ -1,0 +1,40 @@
+model: "base_model_from_huggingface"
+continued_training: False
+access_token: null
+output_dir: "output_directory"
+stages:
+  - stage1:
+      epochs: 1.0
+      datasets: 
+        - dataset1:
+            path: path to dataset 1
+            n_samples: 800 # Must not be greater than total number of samples
+        - dataset2: path to dataset 2 # All samples will be used
+  - stage2:
+      epochs: 0.5
+      datasets:
+        - dataset3: path to dataset 3
+val_dataset_file: null
+lora_r: 64
+lora_alpha: 64
+lora_dropout: 0 # Any is okay, but 0 is optimized in unsloth
+lora_target_modules: ["q_proj", "k_proj", "v_proj", "o_proj",
+                      "gate_proj", "up_proj", "down_proj"]
+modules_to_save: ["embed_tokens", "lm_head"]
+micro_batch_size: 1
+gradient_accumulation_steps: 64
+max_grad_norm: 1.0
+learning_rate: 0.0001
+lr_scheduler_type: cosine_with_restarts
+lr_scheduler_kwargs:
+  num_cycles: 2
+warmup_steps: 120
+max_ctx_len: 8192
+logging_steps: 5
+eval_steps: 50
+save_steps: 500
+save_total_limit: 8
+add_imstart_token: True
+map_eos_to_imend: True # Sometimes tokenizer does not work properly with *replaced* eos token, this is a workaround
+load_in_4bit: False
+cpu_offload_embeddings: True # Offload original embed_tokens and lm_head when they are in modules_to_save

@@ -5,7 +5,7 @@ import os
 from typing_extensions import Annotated
 
 from kolibrify.inference import load_model, predict
-from kolibrify.config import load_training_config
+from kolibrify.core import load_base_config
 
 
 package_path = os.path.dirname(__file__)
@@ -50,6 +50,7 @@ def save_responses(conversations, path):
 
 def main(
     config_path: Annotated[str, typer.Argument()],
+    checkpoint: Annotated[str, typer.Option()] = None,
     eval_lang: Annotated[str, typer.Option()] = 'en',
     backend: Annotated[str, typer.Option()] = 'vllm',
     type: Annotated[str, typer.Option()] = 'last',
@@ -58,7 +59,9 @@ def main(
     max_output_tokens: Annotated[int, typer.Option()] = 4096,
     gpus: Annotated[str, typer.Option()] = '0'
 ):
-    _, config = load_training_config(config_path)
+    _, config = load_base_config(config_path)
+    if checkpoint is not None:
+        config.output_dir = os.path.join(config.output_dir, checkpoint)
     model = load_model(config, backend, temp, top_p, max_output_tokens, gpus)
     assert os.path.exists(os.path.join(config.output_dir, "merged")), "The model must be merged but is not."
     assert eval_lang in ['en', 'ru'], f"Only 'ru' and 'en' are supported, but got {eval_lang}."

@@ -1,10 +1,8 @@
 import typer
 from typing_extensions import Annotated
-from peft import PeftModel
 import os
 
-from .model_utils import get_model
-from .config import load_training_config
+from .core import get_model, load_base_config
 
 
 def share(
@@ -13,19 +11,20 @@ def share(
     quantize: Annotated[str, typer.Option(help="Type of quantization. See llama.ccp for supported quants.")] = None,
     hf_token: Annotated[str, typer.Option(help="Your huggingface token.")] = None
 ):
-    _, config = load_training_config(config_path)
+    _, config = load_base_config(config_path)
     token = config.access_token
     if hf_token is not None:
         token = hf_token
     
     model_path = os.path.join(config.output_dir, 'merged')
+    assert os.path.exists(model_path), f'Model {model_path} does not exist.'
     
     # Do not load in 8-bit to be able to merge
     # Do not load on gpu to avoid OOM
     model, tokenizer = get_model(
         model_path, load_in_4bit=False, device_map=None,
         max_seq_length=config.max_ctx_len,
-        loading_lora=False, add_imstart_token=False)
+        loading_lora=False, add_imstart_token=False, map_eos=False)
     print('Loaded model.')
     
     if quantize is not None:

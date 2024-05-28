@@ -2,7 +2,6 @@ import typer
 from typing_extensions import Annotated
 from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
 import os
-import yaml
 
 import torch
 torch.manual_seed(0)
@@ -10,24 +9,21 @@ import random
 random.seed(0)
 
 import transformers
-from trl import SFTTrainer, DataCollatorForCompletionOnlyLM
+from trl import SFTTrainer
 from unsloth import FastLanguageModel
-from .data_utils import load_dataset
-from .model_utils import get_model, free_mem, cpu_offload_embeddings
-from .config import load_training_config
-from .data_collators import get_data_collator
+from .core import get_model, free_mem, cpu_offload_embeddings
+from .core import save_config
+from .sft import load_dataset, load_training_config, get_data_collator
 
 
 def main(
     config_path: Annotated[str, typer.Argument()] = "training_config.yaml"
 ):
-    yaml_config, config = load_training_config(config_path)
+    config_dict, config = load_training_config(config_path)
     print(config)
     
     os.makedirs(config.output_dir, exist_ok=True)
-    with open(os.path.join(config.output_dir, 'kolibrify-config.yaml'), 'w') as f:
-        yaml.safe_dump(yaml_config, f, sort_keys=False)
-        print('Saved config in the output directory.')
+    save_config(config_dict)
     
     with Progress(
         SpinnerColumn(),
@@ -36,24 +32,26 @@ def main(
         transient=True,
     ) as progress:
         # --- Load datasets and model
-        task1 = progress.add_task(description="Loading dataset...", total=None)
-        train_data, val_data, data_iterations = load_dataset(
-            stages=config.stages, 
-            val_dataset_path=config.val_dataset_file
-        )
-        progress.print('Total data iterations:', data_iterations)
-        progress.advance(task1)
-        
-        task2 = progress.add_task(description="Loading model...", total=None)
+        task1 = progress.add_task(description="Loading model...", total=None)
         model, tokenizer = get_model(
             model_name=config.model, 
             max_seq_length=config.max_ctx_len,
             token=config.access_token,
             load_in_4bit=config.load_in_4bit,
-            add_imstart_token=config.add_imstart_token
+            add_imstart_token=config.add_imstart_token,
+            map_eos=config.map_eos_to_imend
         )
-        
         free_mem()
+        progress.advance(task1)
+
+        task2 = progress.add_task(description="Loading dataset...", total=None)
+        train_data, val_data, data_iterations = load_dataset(
+            stages=config.stages, 
+            val_dataset_path=config.val_dataset_file,
+            tokenizer=tokenizer,
+            config=config
+        )
+        progress.print('Total data iterations:', data_iterations)
         progress.advance(task2)
     
         # --- Setup all training stuff

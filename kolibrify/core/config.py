@@ -1,25 +1,12 @@
 from dataclasses import dataclass, field, _MISSING_TYPE
-import yaml
 from typing import List, Union, Optional
+import yaml
+import os
 
 
 @dataclass
-class DatasetConfig:
-    path: str
-    n_samples: int = -1
-
-
-@dataclass
-class StageConfig:
-    name: str
-    epochs: float
-    datasets: List[DatasetConfig]
-
-
-@dataclass
-class TrainingConfig:
+class BaseConfig:
     model: str
-    stages: List[StageConfig]
     continued_training: bool = False
     checkpoint: Optional[str] = None
     access_token: Union[str, None] = None
@@ -44,41 +31,18 @@ class TrainingConfig:
     save_steps: int = 60
     save_total_limit: int = 3
     add_imstart_token: bool = True
+    map_eos_to_imend: bool = True
     load_in_4bit: bool = True
     cpu_offload_embeddings: bool = False
 
 
-def load_stage_configs(stage_dicts: list) -> List[StageConfig]:
-    stages = []
-    for stage_dict in stage_dicts:
-        stage_name = list(stage_dict.keys())[0]
-        stage_dict = stage_dict[stage_name]
-        epochs = stage_dict['epochs']
-        dataset_dicts = stage_dict['datasets']
-        dataset_configs = []
-        for dataset_dict in dataset_dicts:
-            v = list(dataset_dict.values())[0]
-            if isinstance(v, str):
-                # Only path is provided
-                dataset_configs.append(DatasetConfig(v))
-                continue
-            
-            path = v['path']
-            n_samples = v.get('n_samples', -1)
-            dataset_configs.append(DatasetConfig(path, n_samples))
-        
-        stage = StageConfig(stage_name, epochs, dataset_configs)
-        stages.append(stage)
-    return stages
-
-
-def load_training_config(config_path) -> tuple[dict, TrainingConfig]:
+def load_base_config(config_path) -> tuple[dict, BaseConfig]:
     with open(config_path) as f:
-        config = yaml.safe_load(f)
+        config_dict = yaml.safe_load(f)
     
-    _config = dict([(k, v) for k, v in config.items() if v is not None])
+    _config = dict([(k, v) for k, v in config_dict.items() if v is not None])
     # Check data integrity
-    fields = TrainingConfig.__dataclass_fields__
+    fields = BaseConfig.__dataclass_fields__
     missing_keys = list(set(fields.keys()) - set(_config.keys()))
     if len(missing_keys) > 0:
         for k in missing_keys:
@@ -86,19 +50,21 @@ def load_training_config(config_path) -> tuple[dict, TrainingConfig]:
             if isinstance(default_val, _MISSING_TYPE):
                 default_val = fields[k].default_factory()
             print(f'WARNING! Missing key: {k}. Setting to default value: {default_val}')
-
-    stages = load_stage_configs(_config['stages'])
-    _config['stages'] = stages
+    _config.pop('stages')
     
-    training_config = TrainingConfig(**_config)
+    training_config = BaseConfig(**_config)
     
     if training_config.add_imstart_token:
         assert 'embed_tokens' in training_config.modules_to_save and 'lm_head' in training_config.modules_to_save, \
             "add_imstart_token=True, but you don't train embed_tokens and lm_head. Set modules_to_save to [\"embed_tokens\", \"lm_head\"]"
             
-    return config, TrainingConfig(**_config)
+    return config_dict, training_config
 
 
-if __name__ == "__main__":
-    config = load_training_config("training_config.yaml")
-    print(config)
+def save_config(config_dict: dict):
+    output_dir = config_dict['output_dir']
+    # Remove token info
+    config_dict['access_token'] = None
+    with open(os.path.join(output_dir, 'kolibrify-config.yaml'), 'w') as f:
+        yaml.safe_dump(config_dict, f, sort_keys=False)
+        print('Saved config in the output directory.')
