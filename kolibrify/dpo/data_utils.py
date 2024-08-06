@@ -3,8 +3,9 @@ import random
 import copy
 import json
 from typing import List
+from warnings import warn
 
-from kolibrify.core import CurriculumDataGen, SimpleDataGen, load_jsonl
+from kolibrify.core import CurriculumDataGen, SimpleDataGen, load_jsonl, ChatMLFormatter
 
 from .config import StageConfig, DatasetConfig
 
@@ -45,6 +46,7 @@ def load_jsonl_data(datasets: List[DatasetConfig], epochs: float):
 
 # TODO: update curriculum sampling
 def load_dataset(stages: List[StageConfig], val_dataset_path=None, format_fn=None):
+    warn("Tool calling is not supported when doing DPO tuning atm (you'll get an exception). Just so you know.")
     if format_fn is None:
         format_fn = format_chatml
 

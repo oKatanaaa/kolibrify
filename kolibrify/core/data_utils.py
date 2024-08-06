@@ -2,6 +2,9 @@ import random
 import copy
 import json
 from typing import List
+from jsonschema import validate
+
+from .data_consts import *
 
 
 def load_jsonl(path):
@@ -51,20 +54,77 @@ class SimpleDataGen:
 
 class ChatMLFormatter:
     @staticmethod
-    def format_chatml(chat: list[dict[str, str]] = dict()) -> str:
+    def format_chatml(chat: list[dict[str, str]]) -> str:
         """
         Uses https://github.com/openai/openai-python/blob/main/chatml.md as chat format.
         """
         chat = chat['messages']
-        raw_chat_text = ""
-        for item in chat:
+        raw_chat_text = ChatMLFormatter.generate_system_message(chat)
+        for msg in chat:
             if len(raw_chat_text) > 0:
                 raw_chat_text += '\n'
-            role = item['role']
-            content = item['content']
-            raw_chat_text += f"<|im_start|>{role}\n{content}<|im_end|>"
+            raw_chat_text += ChatMLFormatter.format_msg(msg, chat)
         return raw_chat_text
     
+    @staticmethod
+    def generate_system_message(chat: list[dict[str, str]]):
+        messages = chat['messages']
+        tools = chat.get('tools')
+
+        system_message = ChatMLFormatter.IM_START
+        if messages[0]['role'] == 'system':
+            content = messages[0]['content']
+            system_message += f'system\n{content}'
+
+        if tools is not None:
+            validate(instance=tools, schema=TOOLS_SCHEMA)
+            if len(system_message) > 0:
+                system_message += '\n'
+            system_message += TOOLS_PROMPT_EN.format(tools=tools)
+        
+        if len(system_message) == 0:
+            return ""
+        
+        system_message += ChatMLFormatter.IM_END
+        return system_message
+
+    @staticmethod
+    def format_msg(msg, chat):
+        # At the moment chat is not used
+        # But it is planned to use its context to validate tool calls
+        role = msg['role']
+        if role == USER_ROLE:
+            return ChatMLFormatter.format_user_msg(msg)
+        elif role == ASSISTANT_ROLE:
+            return ChatMLFormatter.format_assistant_msg(msg)
+        elif role == 'tool':
+            return ChatMLFormatter.format_tool_response(msg)
+    
+    @staticmethod
+    def format_user_msg(msg):
+        return MSG_TEMPLATE.format(role=USER_ROLE, content=msg['content'])
+    
+    @staticmethod
+    def format_assistant_msg(msg):
+        msg_content = ""
+        content = msg.get('content')
+        tool_call = msg.get('tool_call')
+
+        if content is not None:
+            msg_content += content
+
+        if msg.get('tool_call') is not None:
+            msg_content += TOOL_MSG_TEMPLATE.format(content=tool_call)
+
+        assert msg_content != "", "Empty assistant message"
+
+        return MSG_TEMPLATE.format(role=ASSISTANT_ROLE, content=msg_content)
+
+    @staticmethod
+    def format_tool_response(tool_response):
+        tool_msg = TOOL_RESPONSE_TEMPLATE.format(content=tool_response)
+        return MSG_TEMPLATE.format(role=USER_ROLE, content=tool_msg)
+
     def __init__(self, tokenizer, max_len):
         self.tokenizer = tokenizer
         self.max_len = max_len
