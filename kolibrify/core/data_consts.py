@@ -1,7 +1,8 @@
 IM_START = '<|im_start|>'
 IM_END = '<|im_end|>'
-USER_ROLE = 'user'
-ASSISTANT_ROLE = 'assistant'
+ROLE_SYSTEM = 'system'
+ROLE_USER = 'user'
+ROLE_ASSISTANT = 'assistant'
 MSG_TEMPLATE = IM_START + "{role}\n{content}" + IM_END
 
 TOOLS_SCHEMA = {
@@ -172,5 +173,5 @@ TOOLS_PROMPT_RU = """### ИНСТРУМЕНТЫ
 Затем используй ответ инструмента, чтобы выполнить запрос пользователя.
 """.strip('\n')
 
-TOOL_MSG_TEMPLATE = "<tool_call>\n{content}\n</tool_call>"
-TOOL_RESPONSE_TEMPLATE = "<tool_response>\n{content}\n</tool_response>"
+TOOL_CALL_TEMPLATE = "<tool_call>\n{{\"tool_name\": {name}, \"arguments\": {arguments}}}\n</tool_call>"
+TOOL_RESPONSE_TEMPLATE = "<tool_response>\n{{\"tool_name\": {name}, \"response\": {response}}}\n</tool_response>"

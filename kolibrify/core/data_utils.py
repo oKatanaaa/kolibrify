@@ -58,9 +58,8 @@ class ChatMLFormatter:
         """
         Uses https://github.com/openai/openai-python/blob/main/chatml.md as chat format.
         """
-        chat = chat['messages']
-        raw_chat_text = ChatMLFormatter.generate_system_message(chat)
-        for msg in chat:
+        raw_chat_text, msgs = ChatMLFormatter.generate_system_message(chat)
+        for msg in msgs:
             if len(raw_chat_text) > 0:
                 raw_chat_text += '\n'
             raw_chat_text += ChatMLFormatter.format_msg(msg, chat)
@@ -71,38 +70,43 @@ class ChatMLFormatter:
         messages = chat['messages']
         tools = chat.get('tools')
 
-        system_message = ChatMLFormatter.IM_START
-        if messages[0]['role'] == 'system':
+        if messages[0]['role'] != ROLE_SYSTEM and tools is None:
+            return "", messages
+
+        system_message = IM_START + 'system\n'
+        if messages[0]['role'] == ROLE_SYSTEM:
             content = messages[0]['content']
-            system_message += f'system\n{content}'
+            system_message += content
+            # Remove system message from messages so that it does not go
+            # into future formatting methods
+            messages = messages[1:]
 
         if tools is not None:
             validate(instance=tools, schema=TOOLS_SCHEMA)
-            if len(system_message) > 0:
+            if messages[0]['role'] == ROLE_SYSTEM:
                 system_message += '\n'
-            system_message += TOOLS_PROMPT_EN.format(tools=tools)
+            system_message += TOOLS_PROMPT_EN.format(tools=json.dumps(tools))
         
-        if len(system_message) == 0:
-            return ""
-        
-        system_message += ChatMLFormatter.IM_END
-        return system_message
+        system_message += IM_END
+        return system_message, messages
 
     @staticmethod
     def format_msg(msg, chat):
         # At the moment chat is not used
         # But it is planned to use its context to validate tool calls
         role = msg['role']
-        if role == USER_ROLE:
+        if role == ROLE_USER:
             return ChatMLFormatter.format_user_msg(msg)
-        elif role == ASSISTANT_ROLE:
+        elif role == ROLE_ASSISTANT:
             return ChatMLFormatter.format_assistant_msg(msg)
         elif role == 'tool':
             return ChatMLFormatter.format_tool_response(msg)
+        elif role == ROLE_SYSTEM:
+            raise ValueError("System message should not be in messages")
     
     @staticmethod
     def format_user_msg(msg):
-        return MSG_TEMPLATE.format(role=USER_ROLE, content=msg['content'])
+        return MSG_TEMPLATE.format(role=ROLE_USER, content=msg['content'])
     
     @staticmethod
     def format_assistant_msg(msg):
@@ -114,16 +118,27 @@ class ChatMLFormatter:
             msg_content += content
 
         if msg.get('tool_call') is not None:
-            msg_content += TOOL_MSG_TEMPLATE.format(content=tool_call)
+            if msg_content:
+                msg_content += '\n'
+            msg_content += ChatMLFormatter.format_tool_call(tool_call)
 
         assert msg_content != "", "Empty assistant message"
 
-        return MSG_TEMPLATE.format(role=ASSISTANT_ROLE, content=msg_content)
+        return MSG_TEMPLATE.format(role=ROLE_ASSISTANT, content=msg_content)
+    
+    @staticmethod
+    def format_tool_call(tool_call):
+        tool_name = tool_call['tool_name']
+        tool_args = json.dumps(tool_call['arguments'])
+        tool_msg = TOOL_CALL_TEMPLATE.format(name=tool_name, arguments=tool_args)
+        return tool_msg
 
     @staticmethod
-    def format_tool_response(tool_response):
-        tool_msg = TOOL_RESPONSE_TEMPLATE.format(content=tool_response)
-        return MSG_TEMPLATE.format(role=USER_ROLE, content=tool_msg)
+    def format_tool_response(tool_msg):
+        tool_name = tool_msg['name']
+        tool_response = tool_msg['content']
+        tool_response_xml = TOOL_RESPONSE_TEMPLATE.format(name=tool_name, response=tool_response)
+        return MSG_TEMPLATE.format(role=ROLE_USER, content=tool_response_xml)
 
     def __init__(self, tokenizer, max_len):
         self.tokenizer = tokenizer
@@ -151,11 +166,4 @@ class ChatMLFormatter:
             _samples.append({'messages': sample})
         prompts = [ChatMLFormatter.format_chatml(sample) for sample in _samples]
         batched_dict = self.tokenize(prompts)
-        # out_dicts = []
-        # for i in range(len(prompts)):
-        #     input_ids = batched_dict['input_ids'][i]
-        #     labels = batched_dict['labels'][i]
-        #     out_dicts.append(
-        #         {'input_ids': input_ids, 'labels': labels, 'prompt': prompts[i]}
-        #     )
         return batched_dict
