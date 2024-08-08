@@ -72,6 +72,44 @@ TOOLS_SCHEMA = {
     }
 }
 
+TOOL_CALL_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "name": {
+            "type": "string"
+        },
+        "arguments": {
+            "type": "object",
+            "patternProperties": {
+                "^[a-zA-Z_][a-zA-Z0-9_]*$": {
+                    "type": ["object", "string", "number", "boolean", "array", "null"]
+                }
+            },
+            "additionalProperties": False
+        }
+    },
+    "required": ["name", "arguments"],
+    "additionalProperties": False
+}
+
+TOOL_RESPONSE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "role": {
+            "type": "string",
+            "enum": ["tool"]
+        },
+        "name": {
+            "type": "string"
+        },
+        "content": {
+            "type": "string"
+        }
+    },
+    "required": ["name", "content"],
+    "additionalProperties": False
+}
+
 
 TOOLS_PROMPT_EN = """### TOOLS
 You have access to the following tools:

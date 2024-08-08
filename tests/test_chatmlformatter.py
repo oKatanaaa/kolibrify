@@ -1,5 +1,6 @@
 import unittest
 import json
+from jsonschema import ValidationError
 
 from kolibrify.core.data_utils import ChatMLFormatter
 from kolibrify.core.data_consts import *
@@ -8,10 +9,10 @@ from kolibrify.core.data_consts import *
 class TestChatMLFormatter(unittest.TestCase):
     def setUp(self):
         # Setup any required variables or objects
-        self.chatml_formatter = ChatMLFormatter(None, 512)  # tokenizer and max_len set to 512 for example
+        self.chatml_formatter = ChatMLFormatter(None, 512, True)  # tokenizer and max_len set to 512 for example
         self.maxDiff = None
 
-    def test_format_chatml_regular_messages(self):
+    def test_regular_messages(self):
         chat = {
             'messages': [
                 {'role': 'user', 'content': 'Hello!'},
@@ -25,7 +26,7 @@ class TestChatMLFormatter(unittest.TestCase):
         )
         self.assertEqual(formatted_chat, expected_output)
 
-    def test_format_chatml_with_system_message(self):
+    def test_with_system_message(self):
         chat = {
             'messages': [
                 {'role': 'system', 'content': 'You are an AI assistant.'},
@@ -41,12 +42,12 @@ class TestChatMLFormatter(unittest.TestCase):
         )
         self.assertEqual(formatted_chat, expected_output)
 
-    def test_format_chatml_with_tool_call(self):
+    def test_tool_call(self):
         chat = {
             'messages': [
                 {'role': 'user', 'content': 'What is the weather like today in Boston?'},
                 {'role': 'assistant', 'content': 'Let me check the weather for you.', 'tool_call': {
-                    "tool_name": "get_current_weather",
+                    "name": "get_current_weather",
                     "arguments": {
                         "location": "Boston",
                         "format": "celsius"
@@ -95,6 +96,285 @@ class TestChatMLFormatter(unittest.TestCase):
         )
         self.assertEqual(formatted_chat, expected_output)
 
+    def test_incorrect_tool_specification(self):
+        chat = {
+            'messages': [
+                {'role': 'user', 'content': 'What is the weather like today in Boston?'},
+                {'role': 'assistant', 'content': 'Let me check the weather for you.', 'tool_call': {
+                    "name": "get_current_weather",
+                    "arguments": {
+                        "location": "Boston",
+                        "format": "celsius"
+                    }}},
+                {'role': 'tool', 'name': 'get_current_weather', 'content': 'The weather today is sunny with a high of 25°C.'}
+            ],
+            'tools': [
+                {
+                    "name": "get_current_weather",
+                    "description": "Get the current weather",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "location": {
+                                "type": "string",
+                                "description": "The city and state, e.g. San Francisco, CA",
+                            },
+                            "format": {
+                                "type": "string",
+                                "enum": ["celsius", "fahrenheit"],
+                                "description": "The temperature unit to use. Infer this from the users location.",
+                            },
+                        },
+                        "required": ["location", "format"],
+                    }
+                }
+            ]
+        }
+        
+        with self.assertRaises(ValidationError) as context:
+            self.chatml_formatter.format_chatml(chat)
+
+    def test_incorrect_tool_call_schema(self):
+        chat = {
+            'messages': [
+                {'role': 'user', 'content': 'What is the weather like today in Boston?'},
+                {'role': 'assistant', 'content': 'Let me check the weather for you.', 'tool_call': {
+                    "toolname": "get_current_weather",
+                    "arguments": {
+                        "location": "Boston",
+                        "format": "celsius"
+                    }}},
+                {'role': 'tool', 'name': 'get_current_weather', 'content': 'The weather today is sunny with a high of 25°C.'}
+            ],
+            'tools': [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "get_current_weather",
+                        "description": "Get the current weather",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "location": {
+                                    "type": "string",
+                                    "description": "The city and state, e.g. San Francisco, CA",
+                                },
+                                "format": {
+                                    "type": "string",
+                                    "enum": ["celsius", "fahrenheit"],
+                                    "description": "The temperature unit to use. Infer this from the users location.",
+                                },
+                            },
+                            "required": ["location", "format"],
+                        },
+                    }
+                }
+            ]
+        }
+        
+        with self.assertRaises(ValidationError) as context:
+            self.chatml_formatter.format_chatml(chat)
+    
+    def test_incorrect_tool_call_args(self):
+        chat = {
+            'messages': [
+                {'role': 'user', 'content': 'What is the weather like today in Boston?'},
+                {'role': 'assistant', 'content': 'Let me check the weather for you.', 'tool_call': {
+                    "name": "get_current_weather",
+                    "arguments": {
+                        "city": "Boston",
+                        "format": "celsius"
+                    }}},
+                {'role': 'tool', 'name': 'get_current_weather', 'content': 'The weather today is sunny with a high of 25°C.'}
+            ],
+            'tools': [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "get_current_weather",
+                        "description": "Get the current weather",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "location": {
+                                    "type": "string",
+                                    "description": "The city and state, e.g. San Francisco, CA",
+                                },
+                                "format": {
+                                    "type": "string",
+                                    "enum": ["celsius", "fahrenheit"],
+                                    "description": "The temperature unit to use. Infer this from the users location.",
+                                },
+                            },
+                            "required": ["location", "format"],
+                        },
+                    }
+                }
+            ]
+        }
+        
+        with self.assertRaises(ValidationError) as context:
+            self.chatml_formatter.format_chatml(chat)
+
+    def test_tool_without_tools(self):
+        chat = {
+            'messages': [
+                {'role': 'user', 'content': 'What is the weather like today in Boston?'},
+                {'role': 'assistant', 'content': 'Let me check the weather for you.', 'tool_call': {
+                    "name": "get_current_weather",
+                    "arguments": {
+                        "city": "Boston",
+                        "format": "celsius"
+                    }}},
+                {'role': 'tool', 'name': 'get_current_weather', 'content': 'The weather today is sunny with a high of 25°C.'}
+            ]
+        }
+        
+        with self.assertRaises(AssertionError) as context:
+            self.chatml_formatter.format_chatml(chat)
+
+        self.assertIn("There are no tools, but a tool call exists", str(context.exception))
+
+    def test_wrong_tool_name(self):
+        chat = {
+            'messages': [
+                {'role': 'user', 'content': 'What is the weather like today in Boston?'},
+                {'role': 'assistant', 'content': 'Let me check the weather for you.', 'tool_call': {
+                    "name": "get_weather",
+                    "arguments": {
+                        "location": "Boston",
+                        "format": "celsius"
+                    }}},
+                {'role': 'tool', 'name': 'get_current_weather', 'content': 'The weather today is sunny with a high of 25°C.'}
+            ],
+            'tools': [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "get_current_weather",
+                        "description": "Get the current weather",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "location": {
+                                    "type": "string",
+                                    "description": "The city and state, e.g. San Francisco, CA",
+                                },
+                                "format": {
+                                    "type": "string",
+                                    "enum": ["celsius", "fahrenheit"],
+                                    "description": "The temperature unit to use. Infer this from the users location.",
+                                },
+                            },
+                            "required": ["location", "format"],
+                        },
+                    }
+                }
+            ]
+        }
+        
+        with self.assertRaises(AssertionError) as context:
+            self.chatml_formatter.format_chatml(chat)
+
+        self.assertIn("Tool get_weather not found in tool context", str(context.exception))
+
+    def test_wrong_tool_response_schema(self):
+        chat = {
+            'messages': [
+                {'role': 'user', 'content': 'What is the weather like today in Boston?'},
+                {'role': 'assistant', 'content': 'Let me check the weather for you.', 'tool_call': {
+                    "name": "get_current_weather",
+                    "arguments": {
+                        "location": "Boston",
+                        "format": "celsius"
+                    }}},
+                {'role': 'tool', 'toolname': 'get_current_weather', 'content': 'The weather today is sunny with a high of 25°C.'}
+            ],
+            'tools': [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "get_current_weather",
+                        "description": "Get the current weather",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "location": {
+                                    "type": "string",
+                                    "description": "The city and state, e.g. San Francisco, CA",
+                                },
+                                "format": {
+                                    "type": "string",
+                                    "enum": ["celsius", "fahrenheit"],
+                                    "description": "The temperature unit to use. Infer this from the users location.",
+                                },
+                            },
+                            "required": ["location", "format"],
+                        },
+                    }
+                }
+            ]
+        }
+        
+        with self.assertRaises(ValidationError) as context:
+            self.chatml_formatter.format_chatml(chat)
+
+    def test_wrong_tool_response_name(self):
+        chat = {
+            'messages': [
+                {'role': 'user', 'content': 'What is the weather like today in Boston?'},
+                {'role': 'assistant', 'content': 'Let me check the weather for you.', 'tool_call': {
+                    "name": "get_current_weather",
+                    "arguments": {
+                        "location": "Boston",
+                        "format": "celsius"
+                    }}},
+                {'role': 'tool', 'name': 'get_weather', 'content': 'The weather today is sunny with a high of 25°C.'}
+            ],
+            'tools': [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "get_current_weather",
+                        "description": "Get the current weather",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "location": {
+                                    "type": "string",
+                                    "description": "The city and state, e.g. San Francisco, CA",
+                                },
+                                "format": {
+                                    "type": "string",
+                                    "enum": ["celsius", "fahrenheit"],
+                                    "description": "The temperature unit to use. Infer this from the users location.",
+                                },
+                            },
+                            "required": ["location", "format"],
+                        },
+                    }
+                }
+            ]
+        }
+        
+        with self.assertRaises(AssertionError) as context:
+            self.chatml_formatter.format_chatml(chat)
+
+        self.assertIn("Tool get_weather not found in tool context", str(context.exception))
+
+    def test_tool_response_without_tools(self):
+        chat = {
+            'messages': [
+                {'role': 'user', 'content': 'What is the weather like today in Boston?'},
+                {'role': 'assistant', 'content': 'Let me check the weather for you.'},
+                {'role': 'tool', 'name': 'get_current_weather', 'content': 'The weather today is sunny with a high of 25°C.'}
+            ]
+        }
+        
+        with self.assertRaises(AssertionError) as context:
+            self.chatml_formatter.format_chatml(chat)
+
+        self.assertIn("There are no tools, but a tool response exists", str(context.exception))
 
 if __name__ == '__main__':
     unittest.main()
