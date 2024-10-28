@@ -32,6 +32,7 @@ class BaseConfig:
     save_total_limit: int = 3
     add_imstart_token: bool = True
     map_eos_to_imend: bool = True
+    custom_tokens: Optional[List[str]] = None
     load_in_4bit: bool = True
     cpu_offload_embeddings: bool = False
 

@@ -119,7 +119,7 @@ You have access to the following tools:
 To use a tool, please provide the tool name and arguments as a valid JSON object. Your response and the JSON should have the following structure:
 <tool_call>
 {{
-    "tool_name": "tool name",
+    "name": "tool name",
     "arguments": {{
         "argument_name": "argument value"
     }}
@@ -129,7 +129,7 @@ To use a tool, please provide the tool name and arguments as a valid JSON object
 For example:
 <tool_call>
 {{
-    "tool_name": "search",
+    "name": "search",
     "arguments": {{
         "query": "recent movies"
     }}
@@ -140,7 +140,7 @@ You may have some commentaries for the user, for example:
 Sure, I'll look for recent movies for you.
 <tool_call>
 {{
-    "tool_name": "search",
+    "name": "search",
     "arguments": {{
         "query": "recent movies"
     }}
@@ -170,7 +170,7 @@ TOOLS_PROMPT_RU = """### ИНСТРУМЕНТЫ
 Чтобы использовать инструмент, предоставь название инструмента и аргументы в виде корректного JSON объекта. Твой ответ и JSON должны иметь следующую структуру:
 <tool_call>
 {{
-    "tool_name": "название инструмента",
+    "name": "название инструмента",
     "arguments": {{
         "название аргумента": "значение аргумента"
     }}
@@ -180,7 +180,7 @@ TOOLS_PROMPT_RU = """### ИНСТРУМЕНТЫ
 Например:
 <tool_call>
 {{
-    "tool_name": "search",
+    "name": "search",
     "arguments": {{
         "query": "недавние фильмы"
     }}
@@ -191,7 +191,7 @@ TOOLS_PROMPT_RU = """### ИНСТРУМЕНТЫ
 Конечно, я поищу для вас недавние фильмы.
 <tool_call>
 {{
-    "tool_name": "search",
+    "name": "search",
     "arguments": {{
         "query": "недавние фильмы"
     }}
@@ -211,5 +211,5 @@ TOOLS_PROMPT_RU = """### ИНСТРУМЕНТЫ
 Затем используй ответ инструмента, чтобы выполнить запрос пользователя.
 """.strip('\n')
 
-TOOL_CALL_TEMPLATE = "<tool_call>\n{{\"tool_name\": {name}, \"arguments\": {arguments}}}\n</tool_call>"
-TOOL_RESPONSE_TEMPLATE = "<tool_response>\n{{\"tool_name\": {name}, \"response\": {response}}}\n</tool_response>"
+TOOL_CALL_TEMPLATE = "<tool_call>\n{{\"name\": {name}, \"arguments\": {arguments}}}\n</tool_call>"
+TOOL_RESPONSE_TEMPLATE = "<tool_response>\n{{\"name\": {name}, \"response\": {response}}}\n</tool_response>"

@@ -14,35 +14,37 @@ def free_mem():
 
 
 # Simplify the shit belows
-def get_source_vocab_size(model_name, loading_lora, token):
+def get_source_vocab_size(model_name, loading_lora, hf_token):
     if loading_lora:
-        peft_config = PeftConfig.from_pretrained(model_name, token = token)
+        peft_config = PeftConfig.from_pretrained(model_name, token = hf_token)
         _model_name = peft_config.base_model_name_or_path
-        _tokenizer = AutoTokenizer.from_pretrained(_model_name, token = token)
+        _tokenizer = AutoTokenizer.from_pretrained(_model_name, token = hf_token)
         return len(_tokenizer.get_vocab())
 
-    _tokenizer = AutoTokenizer.from_pretrained(model_name, token = token)
+    _tokenizer = AutoTokenizer.from_pretrained(model_name, token = hf_token)
     return len(_tokenizer.get_vocab())
 
 
-def vocab_has_imend(model_name, loading_lora, token):
+def vocab_has_imend(model_name, loading_lora, hf_token):
     if loading_lora:
-        peft_config = PeftConfig.from_pretrained(model_name, token = token)
+        peft_config = PeftConfig.from_pretrained(model_name, token = hf_token)
         _model_name = peft_config.base_model_name_or_path
-        _tokenizer = AutoTokenizer.from_pretrained(_model_name, token = token)
+        _tokenizer = AutoTokenizer.from_pretrained(_model_name, token = hf_token)
         return '<|im_end|>' in _tokenizer.get_vocab()
 
-    _tokenizer = AutoTokenizer.from_pretrained(model_name, token = token)
+    _tokenizer = AutoTokenizer.from_pretrained(model_name, token = hf_token)
     return '<|im_end|>' in _tokenizer.get_vocab()
 
 
-def determine_new_vocab_size(model_name, token, loading_lora, add_imstart_token, map_eos):
+def determine_new_vocab_size(model_name: str, hf_token: str, loading_lora: bool, add_imstart_token: bool, map_eos: bool, new_tokens: list):
     basic_modifier = int(add_imstart_token)
+    if new_tokens is not None:
+        basic_modifier += len(new_tokens)
 
-    if not vocab_has_imend(model_name, loading_lora, token) and not map_eos:
+    if not vocab_has_imend(model_name, loading_lora, hf_token) and not map_eos:
         basic_modifier += 1
 
-    source_vocab_size = get_source_vocab_size(model_name, loading_lora, token)
+    source_vocab_size = get_source_vocab_size(model_name, loading_lora, hf_token)
     print(f'Source vocab size: {source_vocab_size}')
     resize_model_vocab = None
     
@@ -56,10 +58,10 @@ def get_model(
     model_name, load_in_4bit=True, 
     max_seq_length=4096, device_map='auto', 
     add_imstart_token=False, map_eos=True,
-    token=None, loading_lora=False
+    hf_token=None, loading_lora=False, new_tokens=None
 ):
     resize_model_vocab = determine_new_vocab_size(
-        model_name, token, loading_lora, add_imstart_token, map_eos=map_eos
+        model_name, hf_token, loading_lora, add_imstart_token, map_eos=map_eos, new_tokens=new_tokens
     )
     if resize_model_vocab is None:
         print("Vocab won't be resized.")
@@ -71,20 +73,27 @@ def get_model(
         load_in_4bit=load_in_4bit,
         max_seq_length=max_seq_length,
         device_map=device_map,
-        token=token,
+        token=hf_token,
         resize_model_vocab=resize_model_vocab
     )
     
-    tokenizer = update_tokenizer(tokenizer, add_imstart_token, map_eos)
+    tokenizer = update_tokenizer(tokenizer, add_imstart_token, map_eos, new_tokens)
     _update_model_eos_id(model, tokenizer)
 
     return model, tokenizer
 
 
-def update_tokenizer(tokenizer, add_imstart_token, map_eos):
+def update_tokenizer(tokenizer, add_imstart_token, map_eos, new_tokens):
     print('map_eos', map_eos)
+    additional_special_tokens = []
     if add_imstart_token:
-        tokenizer.add_special_tokens({'additional_special_tokens': ['<|im_start|>']})
+        additional_special_tokens.append('<|im_start|>')
+    
+    if new_tokens is not None:
+        additional_special_tokens.extend(new_tokens)
+    
+    if len(additional_special_tokens) > 0:
+        tokenizer.add_special_tokens({'additional_special_tokens': additional_special_tokens})
     
     if not map_eos:
         print('Not mapping eos token, adding a new one.')
