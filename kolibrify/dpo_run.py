@@ -49,7 +49,8 @@ def main(
             hf_token=config.access_token,
             load_in_4bit=config.load_in_4bit,
             add_imstart_token=config.add_imstart_token,
-            map_eos=config.map_eos_to_imend
+            map_eos=config.map_eos_to_imend,
+            new_tokens=config.custom_tokens
         )
         
         free_mem()
