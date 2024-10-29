@@ -130,7 +130,7 @@ def main(
     print('Finished training')
     # --- Save
     model.save_pretrained(config.output_dir)
-    tokenizer.save_pretrained(os.path.join(config.output_dir, 'tokenizer'))
+    # Don't save the tokenizer since it breaks when loading lora. Better to recreate it
 
 def run():
     typer.run(main)

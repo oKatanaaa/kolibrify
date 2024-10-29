@@ -53,13 +53,19 @@ class SimpleDataGen:
 
 
 class ChatMLFormatter:
-    def __init__(self, tokenizer, max_len, debug=False):
+    def __init__(self, tokenizer, max_len, debug=False, return_tensors=None):
         self.tokenizer = tokenizer
         self.max_len = max_len
         self.debug = debug
+        self.return_tensors = return_tensors
 
-    def __call__(self, sample):
+    def __call__(self, sample, postfix=None):
         prompt = self.format_chatml(sample)
+
+        if postfix is not None:
+            # Useful to add `\n<|im_start|>assistant\n` during inference
+            prompt += postfix
+
         out_dict = self.tokenize(prompt)
         out_dict['prompt'] = prompt
         return out_dict
@@ -69,9 +75,10 @@ class ChatMLFormatter:
             prompt,
             truncation=True,
             max_length=self.max_len,
-            padding=True
+            padding=True,
+            return_tensors=self.return_tensors
         )
-        result["labels"] = result["input_ids"].copy()
+        result["labels"] = copy.deepcopy(result["input_ids"])
         return result
 
     def format_chatml(self, chat: list[dict[str, str]]) -> str:
