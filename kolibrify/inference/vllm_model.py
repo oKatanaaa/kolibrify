@@ -7,9 +7,11 @@ from kolibrify.core.data_utils import ChatMLFormatter
 
 
 def format_prompts_vllm(messages):
+    # tokenizer and max_len parameters are not used here, so can use None
+    formatter = ChatMLFormatter(tokenizer=None, max_len=None)
     prompts = []
     for conv in messages:
-        prompt = ChatMLFormatter.format_chatml(conv)
+        prompt = formatter.format_chatml(conv)
         # Add prefix for assistant response
         prompt += '\n<|im_start|>assistant\n'
         prompts.append(prompt)
@@ -47,10 +49,14 @@ class VllmModel:
             }
             openai_responses.append(openai_response)
         return openai_responses
-    
+
 
 class VllmModelWorker(multiprocessing.Process):
     def __init__(self, data_queue: Queue, result_queue: Queue, merged_model_path: str, gpu_id: int, temp=0.0, top_p=0.95, max_tokens=4096, max_model_len=4096):
+        """
+        Runs on a single GPU in a separate process.
+        Contains a single instance of VllmModel and uses it to generate predictions.
+        """
         super().__init__()
         self.data_queue = data_queue
         self.result_queue = result_queue
@@ -83,6 +89,12 @@ class VllmModelWorker(multiprocessing.Process):
 
 class VllmModelDistributed:
     def __init__(self, merged_model_path: str, gpus: list, temp=0.0, top_p=0.95, max_tokens=4096, max_model_len=4096):
+        """
+        Creates a vLLM worker per GPU. Uses queues to send chats/receive responses.
+        """
+        # Otherwise the following error is raised:
+        # Cannot re-initialize CUDA in forked subprocess. To use CUDA with multiprocessing, you must use the 'spawn' start method
+        multiprocessing.set_start_method("spawn")
         self.workers = []
         for gpu_id in gpus:
             self.workers.append(VllmModelWorker(
@@ -144,7 +156,7 @@ class VllmModelDistributed:
         for w in self.workers:
             w.join()
 
-        self.working = True
+        self.working = False
 
     def _check_working(self):
         assert self.working, 'The workers have been terminated or not launched yet.'

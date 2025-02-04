@@ -29,7 +29,7 @@ lr_scheduler_type: cosine_with_restarts
 lr_scheduler_kwargs:
   num_cycles: 2
 warmup_steps: 120
-max_ctx_len: 8192
+max_ctx_len: S
 logging_steps: 5
 eval_steps: 50
 save_steps: 500

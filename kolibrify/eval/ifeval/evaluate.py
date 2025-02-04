@@ -3,6 +3,7 @@ import json
 import typer
 import os
 from typing_extensions import Annotated
+import multiprocessing
 
 from kolibrify.inference import load_model, predict
 from kolibrify.core import load_base_config

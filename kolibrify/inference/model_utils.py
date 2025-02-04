@@ -30,7 +30,7 @@ def load_model(
 
 
 def predict(
-    model,
+    model: VllmModelDistributed,
     conversations: list,
     type: str = 'last',
 ):
