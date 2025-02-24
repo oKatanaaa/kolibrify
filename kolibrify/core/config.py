@@ -20,6 +20,7 @@ class BaseConfig:
     use_rslora: bool = False
     micro_batch_size: int = 8
     gradient_accumulation_steps: int = 4
+    group_by_seq_len: bool = False
     max_grad_norm: float = 1.0
     learning_rate: float = 1e-5
     lr_scheduler_type: str = "linear"
