@@ -113,7 +113,8 @@ def get_dataset_features():
 def load_dataset(stages: List[StageConfig],
                  tokenizer,
                  config: BaseConfig,
-                 val_dataset_path=None):
+                 val_dataset_path=None,
+                 return_plain_dataset=False):
     """
     Loads the dataset for training and validation.
     
@@ -150,13 +151,17 @@ def load_dataset(stages: List[StageConfig],
     curriculum_datagen = CurriculumDataGen(training_datagens)
 
     features = get_dataset_features()
-    train_dataset = datasets.IterableDataset.from_generator(curriculum_datagen)\
-        .map(
-            format_fn.format_batched,
-            batch_size=config.micro_batch_size,
-            batched=True,
-            features=features
-        )
+    
+    if not return_plain_dataset:
+        train_dataset = datasets.IterableDataset.from_generator(curriculum_datagen)\
+            .map(
+                format_fn.format_batched,
+                batch_size=config.micro_batch_size,
+                batched=True,
+                features=features
+            )
+    else:
+        train_dataset = datasets.Dataset.from_generator(curriculum_datagen)
 
     val_dataset = None
     if val_dataset_path:

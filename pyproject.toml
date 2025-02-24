@@ -6,17 +6,15 @@ build-backend = "setuptools.build_meta"
 name = "kolibrify"
 dynamic = ["version"]
 dependencies = [
-  "datasets ~= 3.1.0",
-  "rich ~= 13.7.0",
-  "typer ~= 0.12.3",
-  "transformers ~= 4.46.3",
-  "trl ~= 0.12.1",
-  "unsloth ~= 2024.11.11",
-  "vllm <= 0.6.4.post1",
-  "langdetect ~= 1.0.9",
-  "nltk ~= 3.8.1",
-  "pymorphy2 ~= 0.9.1",
-  "immutabledict ~= 4.1.0"
+  "datasets == 3.1.0"
+  "transformers == 4.49.0",
+  "trl == 0.15.1",
+  "unsloth == 2025.2.15",
+  "vllm == 0.7.3",
+  "langdetect == 1.0.9",
+  "nltk == 3.8.1",
+  "pymorphy2 == 0.9.1",
+  "immutabledict == 4.1.0"
 ]
 requires-python = ">=3.10"
 authors = [

@@ -1,15 +1,10 @@
 import os
-import typer
-from typing_extensions import Annotated
+import argparse
 
 from .core import get_model, load_base_config
 
 
-def merge(
-    config_path: Annotated[str, typer.Argument()] = "training_config.yaml",
-    checkpoint: Annotated[str, typer.Option()] = None,
-    base_model: Annotated[str, typer.Option()] = None
-):
+def merge(config_path, checkpoint=None, base_model=None):
     _, config = load_base_config(config_path)
     adapter_path = config.output_dir
     if checkpoint is not None:
@@ -30,4 +25,10 @@ def merge(
 
 
 def run():
-    typer.run(merge)
+    parser = argparse.ArgumentParser(description="Merge LoRA adapters into the base model")
+    parser.add_argument("config_path", help="Path to the configuration YAML file")
+    parser.add_argument("--checkpoint", help="Path to a specific checkpoint to merge", default=None)
+    parser.add_argument("--base_model", help="Path to a specific base model", default=None)
+    
+    args = parser.parse_args()
+    merge(args.config_path, args.checkpoint, args.base_model)

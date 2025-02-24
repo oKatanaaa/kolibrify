@@ -1,15 +1,11 @@
-import typer
-from typing_extensions import Annotated
+import argparse
 import os
 
 from .core import get_model, load_base_config
 
 
 def share(
-    config_path: Annotated[str, typer.Argument()],
-    hf_repo: Annotated[str, typer.Argument(help="Name of your HF repository. DO NOT CREATE IT PRIOR TO PUBLISHING.")],
-    quantize: Annotated[str, typer.Option(help="Type of quantization. See llama.ccp for supported quants.")] = None,
-    hf_token: Annotated[str, typer.Option(help="Your huggingface token.")] = None
+    config_path, hf_repo, quantize=None, hf_token=None
 ):
     _, config = load_base_config(config_path)
     token = config.access_token
@@ -35,4 +31,11 @@ def share(
 
 
 def run():
-    typer.run(share)
+    parser = argparse.ArgumentParser(description="Push a model to the Hugging Face Hub")
+    parser.add_argument("config_path", help="Path to the configuration YAML file")
+    parser.add_argument("hf_repo", help="Name of the Hugging Face repository to push to")
+    parser.add_argument("--quantize", help="Type of quantization to use", default=None)
+    parser.add_argument("--hf_token", help="Hugging Face token (overrides config token)", default=None)
+    
+    args = parser.parse_args()
+    share(args.config_path, args.hf_repo, args.quantize, args.hf_token)

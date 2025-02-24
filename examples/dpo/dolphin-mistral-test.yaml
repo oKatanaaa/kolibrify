@@ -1,4 +1,4 @@
-model: "/workspace/recipe_research/models/sft-0423/merged"
+model: "unsloth/mistral-7b-bnb-4bit"
 continued_training: False
 access_token: null
 output_dir: "dolphin-mistral-test"
