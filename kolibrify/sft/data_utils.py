@@ -3,26 +3,61 @@ datasets.disable_caching()
 import random
 import json
 import copy
+from tqdm import tqdm
 from typing import List
-from tokenizers import Tokenizer
 
 from .config import StageConfig, DatasetConfig
 from kolibrify.core.config import BaseConfig
 from kolibrify.core.data_utils import SimpleDataGen, CurriculumDataGen, ChatMLFormatter
 
+# Seems to be a good trade-off of memory for speed
+TOKENIZATION_BATCH_SIZE = 1024
 
-def add_seq_len_to_samples(samples: List[dict], tokenizer: Tokenizer) -> List[dict]:
+
+def add_seq_len_to_samples(samples: List[dict], tokenizer, batch_size=64) -> List[dict]:
     """
-    For each sample in `samples`, concatenate all the 'content' strings 
-    from the sample['messages'] (joined by a space) and compute the token count 
-    using tokenizer.encode_batch. The computed length is stored in sample['seq_len'].
+    Optimized implementation using the tokenizer's native batching capabilities.
+    This leverages the tokenizer's ability to process multiple inputs at once.
+    
+    Args:
+        samples: List of samples to process
+        tokenizer: The tokenizer object
+        batch_size: Number of samples to process in each batch
+        
+    Returns:
+        The samples with 'seq_len' added to each
     """
-    for sample in samples:
-        # Extract the 'content' strings from each message.
-        content_strs = [msg.get('content', '') for msg in sample.get('messages', [])]
-        concatenated = " ".join(content_strs)
-        tokenized = tokenizer.tokenize(concatenated)
-        sample['seq_len'] = len(tokenized)
+    # Process in batches to avoid potential memory issues with very large datasets
+    total_batches = (len(samples) + batch_size - 1) // batch_size
+    
+    # Create a progress bar using tqdm
+    with tqdm(total=total_batches, desc="Estimating length") as pbar:
+        for i in range(0, len(samples), batch_size):
+            batch = samples[i:i+batch_size]
+            
+            # Extract all content for the batch
+            batch_texts = []
+            for sample in batch:
+                content_strs = [msg.get('content', '') for msg in sample.get('messages', [])]
+                batch_texts.append(" ".join(content_strs))
+            
+            # Use the tokenizer's batch processing capabilities
+            encoded = tokenizer(
+                batch_texts,
+                truncation=False,     # Don't truncate to get actual lengths
+                padding=False,        # No padding to get accurate lengths
+                return_tensors=None,  # Don't convert to tensors
+                add_special_tokens=True  # Include special tokens in the count
+            )
+            
+            # Extract the lengths from the input_ids
+            input_ids = encoded['input_ids']
+            for j, sample in enumerate(batch):
+                sample['seq_len'] = len(input_ids[j])
+            
+            # Update the progress bar
+            pbar.update(1)
+    
     return samples
 
 
@@ -140,7 +175,7 @@ def load_dataset(stages: List[StageConfig],
         samples = load_jsonl_data(dataset_configs, epochs, format_fn_batched=None)
 
         if config.group_by_seq_len:
-            samples = add_seq_len_to_samples(samples, tokenizer)
+            samples = add_seq_len_to_samples(samples, tokenizer, batch_size=TOKENIZATION_BATCH_SIZE)
             datagen = GroupedSimpleDataGen(samples, epochs, config.micro_batch_size)
         else:
             datagen = SimpleDataGen(samples, epochs)

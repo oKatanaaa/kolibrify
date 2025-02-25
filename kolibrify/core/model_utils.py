@@ -1,6 +1,6 @@
-from transformers import AutoTokenizer
 from unsloth import FastLanguageModel
 from unsloth.chat_templates import get_chat_template
+from transformers import AutoTokenizer
 from peft import PeftConfig
 import gc
 import torch
