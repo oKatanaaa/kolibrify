@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field, _MISSING_TYPE
 import yaml
+import os
 from typing import List, Union, Optional
 
 from kolibrify.core import BaseConfig
@@ -49,6 +50,16 @@ def load_training_config(config_path) -> tuple[dict, TrainingConfig]:
         config = yaml.safe_load(f)
     
     _config = dict([(k, v) for k, v in config.items() if v is not None])
+    
+    # Extract the config filename (without extension) from the path
+    config_filename = os.path.splitext(os.path.basename(config_path))[0]
+    
+    # Update the output_dir to include the config filename
+    assert 'output_dir' in _config
+    _config['output_dir'] = os.path.join(_config['output_dir'], config_filename)
+    # Also update the original config dict
+    config['output_dir'] = _config['output_dir']
+    
     # Check data integrity
     fields = TrainingConfig.__dataclass_fields__
     missing_keys = list(set(fields.keys()) - set(_config.keys()))
@@ -68,7 +79,7 @@ def load_training_config(config_path) -> tuple[dict, TrainingConfig]:
         assert 'embed_tokens' in training_config.modules_to_save and 'lm_head' in training_config.modules_to_save, \
             "add_imstart_token=True, but you don't train embed_tokens and lm_head. Set modules_to_save to [\"embed_tokens\", \"lm_head\"]"
             
-    return config, TrainingConfig(**_config)
+    return config, training_config
 
 
 if __name__ == "__main__":

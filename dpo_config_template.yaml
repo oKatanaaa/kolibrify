@@ -1,45 +1,60 @@
-model: "base_model_from_huggingface"
-continued_training: False
-access_token: null
-output_dir: "output_directory"
+model: "base_model_from_huggingface"  # Path or HF id of the base model to fine-tune
+continued_training: False  # Set to True to continue training from an existing adapter
+access_token: null  # Your HuggingFace access token for private models
+output_dir: "experiments"  # Base directory where training outputs will be saved (config filename will be appended automatically)
+
+# Curriculum learning stages for DPO training - define multiple training phases with different preference datasets
 stages:
-  - stage1:
-      epochs: 1.0
+  - stage1:  # First training stage
+      epochs: 1.0  # Number of epochs to train on this stage's datasets
       datasets: 
-        - dataset1:
-            accepted: path to accepted dataset 1
-            rejected: path to rejected dataset 1
-            n_samples: 800 # Must not be greater than total number of samples
-        - dataset2: # All samples will be used
+        - dataset1:  # First dataset in this stage
+            accepted: path to accepted dataset 1  # Path to JSONL with preferred responses
+            rejected: path to rejected dataset 1  # Path to JSONL with rejected responses
+            n_samples: 800  # Number of samples to use (-1 for all samples)
+        - dataset2:  # Second dataset in this stage, using all samples
             accepted: path to accepted dataset 2
             rejected: path to rejected dataset 2 
-  - stage2:
-      epochs: 0.5
+  - stage2:  # Second training stage
+      epochs: 0.5  # Can use fractional epochs for very large datasets
       datasets:
-      - dataset3: # All samples will be used
+      - dataset3:  # Using all samples from this dataset
           accepted: path to accepted dataset 3
           rejected: path to rejected dataset 3 
-val_dataset_file: null
-lora_r: 64
-lora_alpha: 64
-lora_dropout: 0 # Any is okay, but 0 is optimized in unsloth
-lora_target_modules: ["q_proj", "k_proj", "v_proj", "o_proj",
+
+val_dataset_file: null  # Optional path to validation dataset (not fully supported for DPO yet)
+
+# LoRA adapter parameters
+lora_r: 64  # LoRA attention dimension (rank of the update matrices)
+lora_alpha: 64  # LoRA alpha parameter (scaling factor)
+lora_dropout: 0  # Dropout probability for LoRA layers (0 is optimized in unsloth)
+lora_target_modules: ["q_proj", "k_proj", "v_proj", "o_proj",  # Model modules to apply LoRA
                       "gate_proj", "up_proj", "down_proj"]
-modules_to_save: ["embed_tokens", "lm_head"]
-micro_batch_size: 1
-gradient_accumulation_steps: 64
-max_grad_norm: 1.0
-learning_rate: 0.0001
-lr_scheduler_type: cosine_with_restarts
-lr_scheduler_kwargs:
-  num_cycles: 2
-warmup_steps: 120
-max_ctx_len: 8192
-logging_steps: 5
-eval_steps: 50
-save_steps: 500
-save_total_limit: 8
-add_imstart_token: False
-map_eos_to_imend: False # Sometimes tokenizer does not work properly with *replaced* eos token, this is a workaround
-load_in_4bit: False
-cpu_offload_embeddings: True # Offload original embed_tokens and lm_head when they are in modules_to_save
+modules_to_save: ["embed_tokens", "lm_head"]  # Model modules to save in full (not as LoRA)
+use_rslora: False  # Whether to use rank-stabilized LoRA
+
+# Training hyperparameters
+micro_batch_size: 1  # Batch size per device
+gradient_accumulation_steps: 64  # Number of batches to accumulate before updating weights
+max_grad_norm: 1.0  # Maximum gradient norm for gradient clipping
+learning_rate: 0.0001  # Peak learning rate for optimizer
+lr_scheduler_type: cosine_with_restarts  # Learning rate scheduler type
+lr_scheduler_kwargs:  # Additional parameters for the scheduler
+  num_cycles: 2  # Number of cycles for cosine_with_restarts scheduler
+warmup_steps: 120  # Number of warmup steps for the learning rate
+max_ctx_len: 8192  # Maximum context length in tokens
+
+# Logging and saving
+logging_steps: 5  # How often to log training metrics (in steps)
+eval_steps: 50  # How often to run evaluation (in steps)
+save_steps: 500  # How often to save a checkpoint (in steps)
+save_total_limit: 8  # Maximum number of checkpoints to keep
+
+# Tokenizer and model configuration
+add_imstart_token: False  # Whether to add a special token for instruction messages
+map_eos_to_imend: False  # Whether to map EOS token to im_end token (helps with some tokenizers)
+custom_tokens: null  # Optional list of custom tokens to add to the tokenizer
+
+# Memory optimization
+load_in_4bit: False  # Whether to load model in 4-bit precision
+cpu_offload_embeddings: True  # Whether to offload embed_tokens and lm_head to CPU when they're in modules_to_save

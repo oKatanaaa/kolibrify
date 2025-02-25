@@ -121,11 +121,19 @@ kolibrify-push config.yaml repo-name --quantize quant
 
 See `training_config_template.yaml` for a comprehensive list of adjustable parameters tailored to your training and fine-tuning needs. This includes model identifiers, dataset paths, LoRA parameters, training iterations, learning rate, and more, providing a flexible foundation for model adaptation.
 
-> [!NOTE]
-> This project is in early development stages and will be updated frequently. If you encounter bugs or would like it to support some specific features, kindly make a corresponding issue. Contributions are welcome.
+### Important Configuration Parameters
+
+- **model**: Path or name of the base model from Hugging Face.
+- **output_dir**: Base directory where training outputs will be saved. The config filename (without extension) will be automatically appended to this path. For example, if your config file is named "my_config.yaml" and output_dir is set to "experiments", the actual output will be saved to "experiments/my_config/".
+- **stages**: Defines curriculum learning stages with different datasets and epochs.
+- **lora_r** and **lora_alpha**: LoRA adapter rank and alpha values.
+- **micro_batch_size** and **gradient_accumulation_steps**: Control effective batch size.
+- **max_ctx_len**: Maximum context length for the model.
+
+For more details on each parameter, refer to the comments in the template files.
 
 > [!NOTE]
-> If possible, kindly provide the kolibrify config you used in your model's repo so that others can reproduce your results.
+> This project is in early development stages and will be updated frequently. If you encounter bugs or would like it to support some specific features, kindly make a corresponding issue. Contributions are welcome.
 
 ## Workflow example
 
