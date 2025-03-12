@@ -90,9 +90,11 @@ def main(config_path):
     # Run the training process
     run_training(trainer, config)
 
+    if config.merge:
+        model.save_pretrained_merged(os.path.join(config.output_dir, "merged"), tokenizer, save_method = "merged_16bit")
+
 
 def run():
-    print('asdasd')
     parser = argparse.ArgumentParser(description="Run supervised fine-tuning")
     parser.add_argument("config_path", help="Path to the configuration YAML file")
     args = parser.parse_args()

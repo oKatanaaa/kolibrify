@@ -19,6 +19,8 @@ def share(
     hf_api = HfApi(token=token)
     
     if quantize is not None:
+        raise NotImplementedError('At the moment quantization is not supported.'    \
+            'Please use external utilities to quantize the model')
         model.push_to_hub_gguf(hf_repo, tokenizer, token=token, quantization_method=quantize)
     else:
         hf_api.upload_folder(repo_id=hf_repo, folder_path=model_path, path_in_repo='.', repo_type='model')

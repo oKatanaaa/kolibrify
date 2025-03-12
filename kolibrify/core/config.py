@@ -36,6 +36,7 @@ class BaseConfig:
     custom_tokens: Optional[List[str]] = None
     load_in_4bit: bool = True
     cpu_offload_embeddings: bool = False
+    merge: bool = False
 
 
 def load_base_config(config_path) -> tuple[dict, BaseConfig]:
