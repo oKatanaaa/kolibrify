@@ -11,10 +11,7 @@ dependencies = [
   "trl == 0.15.1",
   "unsloth == 2025.2.15",
   "vllm == 0.7.3",
-  "langdetect == 1.0.9",
-  "nltk == 3.8.1",
-  "pymorphy2 == 0.9.1",
-  "immutabledict == 4.1.0"
+  "huggingface_hub == 0.26.3"
 ]
 requires-python = ">=3.10"
 authors = [

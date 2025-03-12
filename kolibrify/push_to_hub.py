@@ -1,8 +1,9 @@
 import argparse
 import os
+import torch
 
-from .core import get_model, load_base_config
-
+from .core.config import load_base_config
+from huggingface_hub import HfApi
 
 def share(
     config_path, hf_repo, quantize=None, hf_token=None
@@ -13,20 +14,15 @@ def share(
         token = hf_token
     
     model_path = os.path.join(config.output_dir, 'merged')
-    assert os.path.exists(model_path), f'Model {model_path} does not exist.'
+    assert os.path.exists(model_path), f'The model has not been merged. Please merge the model first before pushing to hub.'
     
-    # Do not load in 8-bit to be able to merge
-    # Do not load on gpu to avoid OOM
-    model, tokenizer = get_model(
-        model_path, load_in_4bit=False, device_map=None,
-        max_seq_length=config.max_ctx_len,
-        loading_lora=False, add_imstart_token=False, map_eos=False)
-    print('Loaded model.')
+    hf_api = HfApi(token=token)
     
     if quantize is not None:
         model.push_to_hub_gguf(hf_repo, tokenizer, token=token, quantization_method=quantize)
     else:
-        model.push_to_hub_merged(hf_repo, tokenizer, token=token)
+        hf_api.upload_folder(repo_id=hf_repo, folder_path=model_path, path_in_repo='.', repo_type='model')
+
     print('Pushed to hub.')
 
 
