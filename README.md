@@ -25,6 +25,8 @@ Kolibrify is equipped with four primary scripts for training, merging and testin
 - `kolibrify-predict` - generating predictions using a finetuned model.
 - `kolibrify-eval-ifeval` - evaluating a finetuned model using instruction-following eval.
 - `kolibrify-push` - pushing a model to a Huggingface repo.
+- `kolibrify-chat` - a simple chat interface to talk to the model you just trained.
+
 To run those you have to make a YAML configuration file based on the `training_config_template.yaml`, tailored to your project's needs.
 
 Below is a brief rundown regarding each command. See the `examples` folder for detailed explanations.
@@ -117,6 +119,88 @@ kolibrify-push config.yaml repo-name --quantize quant
 > Do not create the repo manually, it will be created automatically.
 > But if you created the repo beforehand, make sure it is completely empty. Otherwise the push will fail.
 
+## Chat Interface
+
+Kolibrify includes a convenient chat interface for interactive conversations with your fine-tuned models. This feature allows you to test your model's capabilities or vibes directly from the terminal with a natural back-and-forth conversation flow.
+
+#### Basic Usage
+
+To start a chat session with your fine-tuned model:
+
+```bash
+kolibrify-chat your_config.yaml
+```
+
+This will load the model from the "merged" subfolder in your output directory and start an interactive terminal chat session.
+
+#### Multi-Line Input
+
+The chat interface supports multi-line input for both system messages and user messages. This is useful for:
+- Writing code snippets
+- Providing detailed instructions
+- Pasting in longer text
+
+To use multi-line input:
+1. Start typing your message
+2. Press Enter to continue to the next line
+3. When you're done, type `##` on a line by itself to submit
+
+#### Special Commands
+
+The chat interface supports several special commands:
+
+- `back()`: Removes the last model response and user message, allowing you to try a different approach
+- `reset()`: Resets the entire conversation, prompting you to input a new system message
+- `regen()`: Regenerates the model's response to your last message
+- `exit()`: Exits the chat session
+
+#### Advanced Options
+
+The chat interface supports several configuration options:
+
+```bash
+kolibrify-chat your_config.yaml \
+  --temperature 0.7 \
+  --top_p 0.95 \
+  --max_output_tokens 4096 \
+  --gpu_id 0 \
+  --gpu_memory_util 0.9 \
+  --default_context path/to/context.json
+```
+
+Parameters:
+- `--temperature`: Controls randomness (0.0-1.0, default: 0.7)
+- `--top_p`: Controls diversity (0.0-1.0, default: 0.95)
+- `--max_output_tokens`: Maximum number of tokens to generate (default: 4096)
+- `--gpu_id`: GPU ID to use (default: 0)
+- `--gpu_memory_util`: Percentage of GPU memory to utilize (default: 0.9)
+- `--default_context`: Path to a JSON file with a default conversation context
+
+#### Default Context
+
+You can provide a default conversation context as a JSON file:
+
+```json
+{
+  "messages": [
+    {"role": "system", "content": "You are a helpful AI assistant."},
+    {"role": "user", "content": "Hello!"},
+    {"role": "assistant", "content": "Hi there! How can I help you today?"}
+  ]
+}
+```
+
+This can be useful for:
+- Setting up specific personas
+- Continuing previous conversations
+- Testing standard prompts
+
+To use a default context:
+
+```bash
+kolibrify-chat your_config.yaml --default_context path/to/context.json
+```
+
 ## Configuration
 
 See `training_config_template.yaml` for a comprehensive list of adjustable parameters tailored to your training and fine-tuning needs. This includes model identifiers, dataset paths, LoRA parameters, training iterations, learning rate, and more, providing a flexible foundation for model adaptation.
@@ -150,6 +234,11 @@ kolibrify-eval-ifeval config.yaml --eval-lang ru --gpus 0,1,2,3
 kolibrify-push config.yaml kaleinaNyan/model
 kolibrify-push config.yaml kaleinaNyan/model.gguf --quantize q8_0
 ```
+
+## Requirements
+
+Apart from the packages listed in `toml`, you'll need to install https://github.com/oKatanaaa/ifeval to enable
+the evaluation functionality.
 
 
 ## Acknowledgements
