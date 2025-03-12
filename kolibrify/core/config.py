@@ -43,6 +43,16 @@ def load_base_config(config_path) -> tuple[dict, BaseConfig]:
         config_dict = yaml.safe_load(f)
     
     _config = dict([(k, v) for k, v in config_dict.items() if v is not None])
+
+    # Extract the config filename (without extension) from the path
+    config_filename = os.path.splitext(os.path.basename(config_path))[0]
+    
+    # Update the output_dir to include the config filename
+    assert 'output_dir' in _config
+    _config['output_dir'] = os.path.join(_config['output_dir'], config_filename)
+    # Also update the original config dict
+    config_dict['output_dir'] = _config['output_dir']
+
     # Check data integrity
     fields = BaseConfig.__dataclass_fields__
     missing_keys = list(set(fields.keys()) - set(_config.keys()))

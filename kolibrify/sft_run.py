@@ -12,6 +12,7 @@ from .sft import load_dataset, load_training_config, get_data_collator
 
 
 def main(config_path):
+    print('start training')
     # Set random seeds
     setup_seeds()
     
@@ -91,6 +92,7 @@ def main(config_path):
 
 
 def run():
+    print('asdasd')
     parser = argparse.ArgumentParser(description="Run supervised fine-tuning")
     parser.add_argument("config_path", help="Path to the configuration YAML file")
     args = parser.parse_args()

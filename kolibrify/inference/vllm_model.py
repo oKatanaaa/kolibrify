@@ -33,13 +33,14 @@ def split_list(lst, n):
 
 
 class VllmModel:
-    def __init__(self, merged_model_path: str, temp=0.0, top_p=0.95, max_tokens=4096, max_model_len=4096):
-        self.vllm_model = vllm.LLM(merged_model_path, max_model_len=max_model_len)
-        self.sampling_params = vllm.SamplingParams(temperature=temp, top_p=top_p, max_tokens=max_tokens)
+    def __init__(self, merged_model_path: str, temp=0.0, top_p=0.95, min_p=0, max_tokens=4096, max_model_len=4096, use_tqdm=True, gpu_memory_utilization=0.9, enforce_eager=False):
+        self.vllm_model = vllm.LLM(merged_model_path, max_model_len=max_model_len, gpu_memory_utilization=gpu_memory_utilization, enforce_eager=enforce_eager)
+        self.sampling_params = vllm.SamplingParams(temperature=temp, top_p=top_p, max_tokens=max_tokens, min_p=min_p)
+        self.use_tqdm = use_tqdm
 
     def predict(self, convs):
         prompts = format_prompts_vllm(convs)
-        responses = self.vllm_model.generate(prompts=prompts, sampling_params=self.sampling_params)
+        responses = self.vllm_model.generate(prompts=prompts, sampling_params=self.sampling_params, use_tqdm=self.use_tqdm)
         # Extract responses
         openai_responses = []
         for r in responses:
@@ -52,7 +53,7 @@ class VllmModel:
 
 
 class VllmModelWorker(multiprocessing.Process):
-    def __init__(self, data_queue: Queue, result_queue: Queue, merged_model_path: str, gpu_id: int, temp=0.0, top_p=0.95, max_tokens=4096, max_model_len=4096):
+    def __init__(self, data_queue: Queue, result_queue: Queue, merged_model_path: str, gpu_id: int, temp=0.0, top_p=0.95, min_p=0, max_tokens=4096, max_model_len=4096):
         """
         Runs on a single GPU in a separate process.
         Contains a single instance of VllmModel and uses it to generate predictions.
@@ -65,6 +66,7 @@ class VllmModelWorker(multiprocessing.Process):
 
         self.temp = temp
         self.top_p = top_p
+        self.min_p = min_p
         self.max_tokens = max_tokens
         self.max_model_len = max_model_len
 
@@ -74,6 +76,7 @@ class VllmModelWorker(multiprocessing.Process):
             self.merged_model_path, 
             temp=self.temp,
             top_p=self.top_p,
+            min_p=self.min_p,
             max_tokens=self.max_tokens,
             max_model_len=self.max_model_len
         )
@@ -88,7 +91,7 @@ class VllmModelWorker(multiprocessing.Process):
 
 
 class VllmModelDistributed:
-    def __init__(self, merged_model_path: str, gpus: list, temp=0.0, top_p=0.95, max_tokens=4096, max_model_len=4096):
+    def __init__(self, merged_model_path: str, gpus: list, temp=0.0, top_p=0.95, min_p=0, max_tokens=4096, max_model_len=4096):
         """
         Creates a vLLM worker per GPU. Uses queues to send chats/receive responses.
         """
@@ -104,6 +107,7 @@ class VllmModelDistributed:
                 gpu_id,
                 temp=temp,
                 top_p=top_p,
+                min_p=min_p,
                 max_tokens=max_tokens,
                 max_model_len=max_model_len
             ))

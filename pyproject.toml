@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "kolibrify"
 dynamic = ["version"]
 dependencies = [
-  "datasets == 3.1.0"
+  "datasets == 3.1.0",
   "transformers == 4.49.0",
   "trl == 0.15.1",
   "unsloth == 2025.2.15",
@@ -58,3 +58,4 @@ kolibrify-merge = "kolibrify.merge_lora:run"
 kolibrify-push = "kolibrify.push_to_hub:run"
 kolibrify-predict = "kolibrify.predict:run"
 kolibrify-eval-ifeval = "kolibrify.eval.ifeval.evaluate:run"
+kolibrify-chat = "kolibrify.chat:run"
