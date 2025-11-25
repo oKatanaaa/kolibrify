@@ -135,14 +135,17 @@ def load_jsonl_data(datasets_list: List[DatasetConfig],
     return total_samples
 
 
-def get_dataset_features():
-    return datasets.Features({
+def get_dataset_features(include_completion_mask: bool = False):
+    features = {
         'messages': datasets.features.Sequence(datasets.features.Value('null', None), id=None),
         'prompt': datasets.features.Value('string', None),
         'labels': datasets.features.Sequence(datasets.Value('uint64', None), id=None),
         'input_ids': datasets.features.Sequence(datasets.Value('uint64', None), id=None),
         'attention_mask': datasets.features.Sequence(datasets.Value('uint64', None), id=None)
-    })
+    }
+    if include_completion_mask:
+        features['completion_mask'] = datasets.features.Sequence(datasets.Value('uint64', None), id=None)
+    return datasets.Features(features)
 
 
 def load_dataset(stages: List[StageConfig],
@@ -163,7 +166,12 @@ def load_dataset(stages: List[StageConfig],
     In the final pipeline, the samples (raw dictionaries) are converted to tokens by the 
     ChatMLFormatter.format_batched function.
     """
-    format_fn = ChatMLFormatter(tokenizer, config.max_ctx_len)
+    mask_responses = getattr(config, "add_imstart_token", False)
+    format_fn = ChatMLFormatter(
+        tokenizer,
+        config.max_ctx_len,
+        mask_assistant_responses=mask_responses
+    )
 
     training_datagens = {}
     total_data_iterations = 0
@@ -185,7 +193,7 @@ def load_dataset(stages: List[StageConfig],
 
     curriculum_datagen = CurriculumDataGen(training_datagens)
 
-    features = get_dataset_features()
+    features = get_dataset_features(include_completion_mask=mask_responses)
     
     if not return_plain_dataset:
         train_dataset = datasets.IterableDataset.from_generator(curriculum_datagen)\

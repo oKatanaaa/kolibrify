@@ -1,8 +1,13 @@
 import argparse
 import os
+import torch
+
+from .runtime_env import prepare_unsloth_environment
+
+prepare_unsloth_environment()
+
 import unsloth
 from trl import SFTTrainer, SFTConfig
-import torch
 
 from .common_training import (
     setup_seeds, common_training_setup, run_training
@@ -62,12 +67,12 @@ def main(config_path):
         adam_beta2=0.95,
         adam_epsilon=1e-5,
         gradient_checkpointing=True,
-        evaluation_strategy="steps" if val_data is not None else "no",
+        eval_strategy="steps" if val_data is not None else "no",
         save_strategy="steps",
         eval_steps=config.eval_steps,
         save_steps=config.save_steps,
         save_total_limit=config.save_total_limit,
-        report_to="tensorboard",
+        report_to="none",
         # SFT specific parameters
         dataset_text_field="prompt",
         packing=False,

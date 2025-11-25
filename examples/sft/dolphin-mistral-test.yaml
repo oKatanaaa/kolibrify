@@ -1,4 +1,4 @@
-model: "unsloth/mistral-7b-instruct-v0.1-bnb-4bit"
+model: "unsloth/Qwen3-4B-Base-unsloth-bnb-4bit"
 continued_training: False
 access_token: null
 output_dir: "dolphin-mistral-test"
@@ -18,8 +18,8 @@ lora_dropout: 0 # Any is okay, but 0 is optimized in unsloth
 lora_target_modules: ["q_proj", "k_proj", "v_proj", "o_proj",
                       "gate_proj", "up_proj", "down_proj"]
 modules_to_save: ["embed_tokens", "lm_head"]
-micro_batch_size: 2
-gradient_accumulation_steps: 4
+micro_batch_size: 1
+gradient_accumulation_steps: 8
 group_by_seq_len: false
 max_grad_norm: 2.0
 learning_rate: 0.00003
@@ -27,7 +27,7 @@ lr_scheduler_type: "cosine_with_restarts"
 lr_scheduler_kwargs:
   num_cycles: 2
 warmup_steps: 25
-max_ctx_len: 8192
+max_ctx_len: 2048
 logging_steps: 1
 eval_steps: 50
 save_steps: 125 # Save intermediate checkpoints

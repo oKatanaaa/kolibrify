@@ -1,3 +1,15 @@
+# Unsloth-generated cache
+unsloth_compiled_cache/
+_unsloth*/**
+*/_unsloth*/**
+**/_unsloth_temporary_saved_buffers/
+**/_unsloth_temporary_saved_buffers/**
+**/unsloth_compiled_cache/
+**/dolphin-mistral-test*/
+
+# Example artifacts
+examples/**/kolibrify-config.yaml
+
 # Folder with model weights
 experiments*/
 test.ipynb
