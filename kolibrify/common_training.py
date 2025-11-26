@@ -4,6 +4,7 @@ import torch
 import random
 import transformers
 import logging
+import shutil
 
 from .core import get_model, free_mem, cpu_offload_embeddings
 from .core import save_config
@@ -12,6 +13,26 @@ def setup_seeds():
     """Set random seeds for reproducibility."""
     torch.manual_seed(0)
     random.seed(0)
+
+def ensure_c_compiler():
+    """
+    Triton needs a working C compiler. Prefer the conda toolchain if GCC/CC
+    is not already available in PATH.
+    """
+    if os.environ.get("CC") or shutil.which("gcc") or shutil.which("cc"):
+        return
+
+    conda_prefix = os.environ.get("CONDA_PREFIX") or os.environ.get("MAMBA_ROOT_PREFIX") or "/opt/conda"
+    if conda_prefix is None:
+        return
+
+    cc_candidate = os.path.join(conda_prefix, "bin", "x86_64-conda-linux-gnu-gcc")
+    cxx_candidate = os.path.join(conda_prefix, "bin", "x86_64-conda-linux-gnu-g++")
+
+    if os.path.exists(cc_candidate):
+        os.environ["CC"] = cc_candidate
+    if os.path.exists(cxx_candidate):
+        os.environ.setdefault("CXX", cxx_candidate)
 
 def common_training_setup(
     config_dict, 
@@ -29,6 +50,8 @@ def common_training_setup(
     Returns:
         model, tokenizer, train_data, val_data, data_iterations
     """
+    ensure_c_compiler()
+
     # --- Load model
     print("Loading model...")
     model, tokenizer = get_model(

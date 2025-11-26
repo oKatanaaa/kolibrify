@@ -107,6 +107,9 @@ def update_tokenizer(tokenizer, add_imstart_token, map_eos, new_tokens):
         print('Pad token is the same as eos token.')
         print('Updating pad token to unk token.')
         tokenizer.pad_token_id = tokenizer.unk_token_id
+    elif tokenizer.pad_token_id is None:
+        print('Pad token is not set. Falling back to eos token for padding.')
+        tokenizer.pad_token_id = tokenizer.eos_token_id
 
     if tokenizer.padding_side == 'left':
         print('Padding side is left.')

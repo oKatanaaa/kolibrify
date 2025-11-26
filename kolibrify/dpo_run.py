@@ -2,6 +2,10 @@ import argparse
 import os
 import torch
 
+from .runtime_env import prepare_unsloth_environment
+
+prepare_unsloth_environment()
+
 from trl import DPOTrainer, DPOConfig
 from unsloth import PatchDPOTrainer
 # Apply the patch for DPOTrainer
@@ -60,12 +64,12 @@ def main(config_path):
         adam_beta2=0.95,
         adam_epsilon=1e-5,
         gradient_checkpointing=True,
-        evaluation_strategy="steps" if val_data is not None else "no",
+        eval_strategy="steps" if val_data is not None else "no",
         save_strategy="steps",
         eval_steps=config.eval_steps,
         save_steps=config.save_steps,
         save_total_limit=config.save_total_limit,
-        report_to="tensorboard",
+        report_to="none",
         # DPO specific parameters
         max_length=config.max_ctx_len,
         max_prompt_length=config.max_ctx_len,

@@ -53,11 +53,23 @@ class SimpleDataGen:
 
 
 class ChatMLFormatter:
-    def __init__(self, tokenizer, max_len, debug=False, return_tensors=None):
+    def __init__(self, tokenizer, max_len, debug=False, return_tensors=None, mask_assistant_responses=False):
         self.tokenizer = tokenizer
         self.max_len = max_len
         self.debug = debug
         self.return_tensors = return_tensors
+        self.mask_assistant_responses = mask_assistant_responses
+
+        self._assistant_start_ids = None
+        if self.mask_assistant_responses and self.tokenizer is not None:
+            try:
+                # Include the newline after the role marker so the loss starts on the response text.
+                self._assistant_start_ids = self.tokenizer.encode(
+                    f"{IM_START}{ROLE_ASSISTANT}\n", add_special_tokens=False
+                )
+            except Exception:
+                # If we cannot build the pattern we silently skip masking to avoid breaking training.
+                self._assistant_start_ids = None
 
     def __call__(self, sample, postfix=None):
         prompt = self.format_chatml(sample)
@@ -71,6 +83,9 @@ class ChatMLFormatter:
         return out_dict
     
     def tokenize(self, prompt: str) -> List[str]:
+        if self.tokenizer is None:
+            raise ValueError("Tokenizer is required to tokenize prompts.")
+
         result = self.tokenizer(
             prompt,
             truncation=True,
@@ -79,6 +94,15 @@ class ChatMLFormatter:
             return_tensors=self.return_tensors
         )
         result["labels"] = copy.deepcopy(result["input_ids"])
+
+        if self.mask_assistant_responses and self._assistant_start_ids:
+            input_ids = result["input_ids"]
+            # `input_ids` is a list when tokenizing batched prompts with return_tensors=None
+            if len(input_ids) > 0 and isinstance(input_ids[0], list):
+                completion_masks = [self._build_completion_mask(ids) for ids in input_ids]
+            else:
+                completion_masks = self._build_completion_mask(input_ids)
+            result["completion_mask"] = completion_masks
         return result
 
     def format_chatml(self, chat: list[dict[str, str]]) -> str:
@@ -199,3 +223,30 @@ class ChatMLFormatter:
         prompts = [self.format_chatml(sample) for sample in _samples]
         batched_dict = self.tokenize(prompts)
         return batched_dict
+
+    def _build_completion_mask(self, input_ids):
+        ids = input_ids.tolist() if hasattr(input_ids, "tolist") else list(input_ids)
+        if self._assistant_start_ids is None or len(self._assistant_start_ids) == 0:
+            return [0 if token == self.tokenizer.pad_token_id else 1 for token in ids]
+
+        start_idx = self._find_last_pattern_start(ids, self._assistant_start_ids)
+        mask = [0 if token == self.tokenizer.pad_token_id else 1 for token in ids]
+
+        if start_idx is None:
+            return mask
+
+        cutoff = min(len(ids), start_idx + len(self._assistant_start_ids))
+        for i in range(cutoff):
+            mask[i] = 0
+        return mask
+
+    @staticmethod
+    def _find_last_pattern_start(source, pattern):
+        if not pattern:
+            return None
+        last_match = None
+        pat_len = len(pattern)
+        for idx in range(len(source) - pat_len + 1):
+            if source[idx:idx + pat_len] == pattern:
+                last_match = idx
+        return last_match
