@@ -68,9 +68,16 @@ def _rl_generator(server_url: str, batch_size: int) -> Iterable[Dict]:
 
 
 def create_rl_dataset(server_url: str, per_device_batch_size: int) -> datasets.IterableDataset:
-    effective_world_size = int(os.environ.get("WORLD_SIZE", 1))
-    batch_size = per_device_batch_size * effective_world_size
-    print(f"Creating RL dataset with server at {server_url} using batch size {batch_size}")
+    # Each rank/process creates its own IterableDataset, so we should sample only the
+    # per-device batch. Multiplying by WORLD_SIZE would oversubscribe the dataserver
+    # (global batch becomes per_device_batch_size * WORLD_SIZE^2) and delay stage
+    # boundaries that rely on iteration counts.
+    batch_size = per_device_batch_size
+    world_size = os.environ.get("WORLD_SIZE")
+    world_size_note = f" (WORLD_SIZE={world_size})" if world_size else ""
+    print(
+        f"Creating RL dataset with server at {server_url} using per-device batch size {batch_size}{world_size_note}"
+    )
     return datasets.IterableDataset.from_generator(
         lambda: _rl_generator(server_url, batch_size)
     )
