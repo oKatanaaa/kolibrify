@@ -51,10 +51,11 @@ class ConfigError(Exception):
 
 
 def _validate_dataset_config(dataset_id: str, cfg: DatasetConfig) -> None:
-    if len(cfg.graders) != len(cfg.grader_weights):
-        raise ConfigError(
-            f"Dataset '{dataset_id}' must have the same number of graders and grader_weights"
-        )
+    if cfg.graders or cfg.grader_weights:
+        if len(cfg.graders) != len(cfg.grader_weights):
+            raise ConfigError(
+                f"Dataset '{dataset_id}' must have the same number of graders and grader_weights"
+            )
 
 
 def _normalize_weights(items: List[StageDatasetConfig]) -> List[StageDatasetConfig]:

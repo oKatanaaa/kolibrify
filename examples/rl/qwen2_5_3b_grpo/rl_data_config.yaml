@@ -1,0 +1,21 @@
+paths:
+  data_root: "data"
+
+datasets:
+  gsm8k:
+    path: "gsm8k_train.jsonl"
+    graders:
+      - math_exact
+      - number_only
+    grader_weights:
+      - 2.0
+      - 0.5
+
+stages:
+  - name: main
+    until_step: 250
+    datasets:
+      - id: gsm8k
+        weight: 1.0
+
+external_graders: {}

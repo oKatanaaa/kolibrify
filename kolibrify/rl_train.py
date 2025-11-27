@@ -38,6 +38,8 @@ def main(config_path):
     save_config(config_dict, config.paths.output_dir)
 
     print("Loading model...")
+    device_map = {"": torch.cuda.current_device()} if torch.cuda.is_available() else "cpu"
+
     model, tokenizer = get_model(
         model_name=config.model.base_model,
         max_seq_length=config.model.max_seq_length,
@@ -46,6 +48,7 @@ def main(config_path):
         add_imstart_token=config.model.add_imstart_token,
         map_eos=config.model.map_eos_to_imend,
         new_tokens=config.model.custom_tokens,
+        device_map=device_map,
     )
     free_mem()
     print("Model loaded.")
@@ -55,6 +58,9 @@ def main(config_path):
         config.model,
         gradient_checkpointing=config.model.gradient_checkpointing,
     )
+
+    target_device = torch.device("cuda", torch.cuda.current_device()) if torch.cuda.is_available() else torch.device("cpu")
+    model = model.to(target_device)
 
     if config.model.cpu_offload_embeddings:
         cpu_offload_embeddings(model, config.model)
@@ -71,7 +77,7 @@ def main(config_path):
     print("Preparing reward function...")
     reward_fn = build_remote_reward_fn(config.data.server_url)
 
-    importance_sampling_level = None
+    importance_sampling_level = "token"
     if config.rl.rl_algorithm.lower() == "gspo":
         importance_sampling_level = "sequence"
 
@@ -97,6 +103,7 @@ def main(config_path):
         bf16=torch.cuda.is_bf16_supported(),
         gradient_checkpointing=bool(config.model.gradient_checkpointing),
         importance_sampling_level=importance_sampling_level,
+        shuffle_dataset=False,
     )
 
     print("Initializing GRPO Trainer...")
@@ -132,4 +139,3 @@ def run():
     args = parser.parse_args()
 
     main(args.config_path)
-

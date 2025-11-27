@@ -3,14 +3,25 @@ import argparse
 import os
 import sys
 import time
-from typing import List, Dict, Optional, Any
+from types import SimpleNamespace
+from typing import Any, Dict, List, Optional
 
-from kolibrify.core.data_consts import ROLE_SYSTEM, ROLE_USER, ROLE_ASSISTANT
-from kolibrify.sft.config import load_training_config
+import yaml
+
+from kolibrify.core.data_consts import ROLE_ASSISTANT, ROLE_SYSTEM, ROLE_USER
 from kolibrify.inference.vllm_model import VllmModel
+from kolibrify.rl.config import load_rl_config
+from kolibrify.sft.config import load_training_config
+from packaging import version
 
 
-def load_chat_model(config, temperature: float = 0.7, top_p: float = 0.95, max_tokens: int = 4096, gpu_memory_utilization: float = 0.9):
+def load_chat_model(
+    config,
+    temperature: float = 0.7,
+    top_p: float = 0.95,
+    max_tokens: int = 4096,
+    gpu_memory_utilization: float = 0.9,
+):
     """
     Load a VllmModel for chat.
     
@@ -24,10 +35,37 @@ def load_chat_model(config, temperature: float = 0.7, top_p: float = 0.95, max_t
     Returns:
         VllmModel instance
     """
-    model_path = os.path.join(config.output_dir, "merged")
-    if not os.path.exists(model_path):
-        raise FileNotFoundError(f"Model path '{model_path}' does not exist. Make sure you've merged the model first.")
-    
+    candidate_paths = []
+    checkpoint_dir = getattr(config, "checkpoint_dir", None)
+    base_output_dir = getattr(config, "base_output_dir", None)
+
+    if checkpoint_dir:
+        candidate_paths.append(os.path.join(checkpoint_dir, "merged"))
+    candidate_paths.append(os.path.join(config.output_dir, "merged"))
+    if base_output_dir:
+        candidate_paths.append(os.path.join(base_output_dir, "merged"))
+
+    model_path = next((p for p in candidate_paths if os.path.exists(p)), None)
+    if model_path is None:
+        raise FileNotFoundError(
+            "No merged model found. Checked paths:\n" + "\n".join(candidate_paths)
+        )
+
+    # Work around a transformers 4.57.2 tokenizer quirk that breaks local loads when
+    # config.json contains transformers_version <= 4.57.2 (raises AttributeError on dict).
+    cfg_path = os.path.join(model_path, "config.json")
+    if os.path.isfile(cfg_path):
+        try:
+            with open(cfg_path, "r", encoding="utf-8") as f:
+                cfg_data = json.load(f)
+            tf_ver = cfg_data.get("transformers_version")
+            if isinstance(tf_ver, str) and version.parse(tf_ver) <= version.parse("4.57.2"):
+                cfg_data["transformers_version"] = "4.57.3"
+                with open(cfg_path, "w", encoding="utf-8") as f:
+                    json.dump(cfg_data, f, ensure_ascii=True, indent=2)
+        except Exception as e:
+            print(f"Warning: failed to adjust transformers_version in config.json: {e}")
+
     print(f"Loading model from {model_path}...")
     model = VllmModel(
         merged_model_path=model_path,
@@ -254,13 +292,43 @@ def main(config_path, checkpoint, temperature, top_p, max_output_tokens, gpu_id,
     os.environ['CUDA_VISIBLE_DEVICES'] = str(gpu_id)
     
     # Load configuration
-    _, config = load_training_config(config_path)
+    with open(config_path) as f:
+        raw_cfg = yaml.safe_load(f)
+
+    is_rl = isinstance(raw_cfg, dict) and "paths" in raw_cfg
+    if is_rl:
+        _, config = load_rl_config(config_path)
+        output_dir = config.paths.output_dir
+        max_ctx_len = config.model.max_seq_length
+    else:
+        _, config = load_training_config(config_path)
+        output_dir = config.output_dir
+        max_ctx_len = config.max_ctx_len
+
+    base_output_dir = output_dir
+    checkpoint_dir = None
     if checkpoint:
-        config.output_dir = os.path.join(config.output_dir, checkpoint)
+        checkpoint_dir = os.path.join(base_output_dir, checkpoint)
+
+    if not os.path.isabs(base_output_dir):
+        base_output_dir = os.path.join(os.path.dirname(os.path.abspath(config_path)), base_output_dir)
+    if checkpoint_dir and not os.path.isabs(checkpoint_dir):
+        checkpoint_dir = os.path.join(os.path.dirname(os.path.abspath(config_path)), checkpoint_dir)
+
+    # Prefer checkpoint dir if provided, but keep base for fallback
+    output_dir_for_chat = checkpoint_dir or base_output_dir
+
+    # Minimal shim so load_chat_model can stay unchanged
+    config_for_chat = SimpleNamespace(
+        output_dir=output_dir_for_chat,
+        max_ctx_len=max_ctx_len,
+        base_output_dir=base_output_dir,
+        checkpoint_dir=checkpoint_dir,
+    )
     
     # Load model directly using VllmModel
     model = load_chat_model(
-        config=config,
+        config=config_for_chat,
         temperature=temperature,
         top_p=top_p,
         max_tokens=max_output_tokens,

@@ -1,0 +1,53 @@
+model:
+  base_model: "unsloth/Qwen2.5-3B-Instruct"
+  continued_training: false
+  access_token: null
+  load_in_4bit: true
+  lora_r: 64
+  lora_alpha: 64
+  lora_dropout: 0
+  lora_target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
+  modules_to_save:
+    - embed_tokens
+    - lm_head
+  use_rslora: false
+  gradient_checkpointing: "unsloth"
+  max_seq_length: 1024
+  add_imstart_token: false
+  map_eos_to_imend: false
+  custom_tokens: null
+  cpu_offload_embeddings: false
+  merge: false
+
+training:
+  max_steps: 250
+  per_device_train_batch_size: 1
+  gradient_accumulation_steps: 2
+  num_generations: 8
+  temperature: 1.2
+  learning_rate: 0.5e-06
+  weight_decay: 0.1
+  warmup_ratio: 0.1
+  lr_scheduler_type: cosine
+  optim: adamw_8bit
+  logging_steps: 1
+  save_steps: 250
+  report_to: none
+  max_prompt_length: 300
+  max_completion_length: 300
+
+rl:
+  rl_algorithm: gspo
+
+data:
+  server_url: "http://127.0.0.1:9000"
+
+paths:
+  output_dir: "experiments_rl"

@@ -15,6 +15,8 @@ from .graders import (
     GraderInput,
     JsonValidGrader,
     MathExactGrader,
+    NumberOnlyGrader,
+    ReasoningFormatGrader,
 )
 
 
@@ -67,17 +69,20 @@ class GradeResponse(BaseModel):
 
 
 class RLDataServer:
-    def __init__(self, config_path: str):
+    def __init__(self, config_path: str, verbose: bool = False):
         self.config: RLDataConfig = load_config(config_path)
         self.datasets = load_datasets(self.config.datasets)
         self.graders = self._build_graders()
+        self.format_grader = ReasoningFormatGrader()
         self.dataset_rewards = self._build_dataset_rewards()
         self.total_iterations = self.config.stages[-1].until_step
+        self.verbose = verbose
 
     def _build_graders(self) -> Dict[str, object]:
         graders: Dict[str, object] = {
             "json_valid": JsonValidGrader(),
             "math_exact": MathExactGrader(),
+            "number_only": NumberOnlyGrader(),
         }
         for name, cfg in self.config.external_graders.items():
             graders[name] = ExternalHttpGrader(name, cfg)
@@ -86,7 +91,12 @@ class RLDataServer:
     def _build_dataset_rewards(self) -> Dict[str, DatasetReward]:
         rewards: Dict[str, DatasetReward] = {}
         for dataset_id, cfg in self.config.datasets.items():
-            rewards[dataset_id] = DatasetReward(cfg, self.graders)
+            rewards[dataset_id] = DatasetReward(
+                cfg,
+                self.graders,
+                builtin_reasoning_grader=self.format_grader,
+                builtin_weight=1.0,
+            )
         return rewards
 
     def _find_stage(self, iteration: int) -> StageConfig:
@@ -134,11 +144,14 @@ class RLDataServer:
             if idx < 0 or idx >= len(dataset):
                 raise HTTPException(status_code=400, detail=f"Index out of range for dataset {dataset_id}")
             record = dataset[idx]
+            reasoning, answer = self._parse_completion(item.completion)
             grouped.setdefault(dataset_id, []).append(
                 GraderInput(
                     sample_id=item.sample_id,
                     record=record,
                     completion=item.completion,
+                    reasoning=reasoning,
+                    answer=answer,
                     completion_index=item.completion_index,
                 )
             )
@@ -153,6 +166,39 @@ class RLDataServer:
         return results
 
     @staticmethod
+    def _parse_completion(completion: str) -> tuple[str | None, str | None]:
+        """Extract reasoning and final response from a completion.
+
+        Expected format:
+            <think>
+            ...reasoning...
+            </think>
+            ...final response...
+        Returns (None, None) on parse failure.
+        """
+        if not isinstance(completion, str):
+            try:
+                completion = str(completion)
+            except Exception:
+                return None, None
+
+        text = completion.strip()
+        open_tag = "<think>"
+        close_tag = "</think>"
+        start = text.find(open_tag)
+        end = text.find(close_tag)
+
+        if start == -1 or end == -1 or end <= start:
+            return None, None
+
+        reasoning = text[start + len(open_tag) : end].strip()
+        answer = text[end + len(close_tag) :].strip()
+
+        if not reasoning and not answer:
+            return None, None
+        return reasoning or None, answer or None
+
+    @staticmethod
     def _parse_sample_id(sample_id: str) -> tuple[str, int]:
         if ":" not in sample_id:
             raise HTTPException(status_code=400, detail="sample_id must be in the format <dataset_id>:<index>")
@@ -164,8 +210,8 @@ class RLDataServer:
         return dataset_id, idx
 
 
-def create_app(config_path: str) -> FastAPI:
-    server = RLDataServer(config_path)
+def create_app(config_path: str, verbose: bool = False) -> FastAPI:
+    server = RLDataServer(config_path, verbose=verbose)
     app = FastAPI()
 
     @app.get("/meta", response_model=MetaResponse)
@@ -183,6 +229,33 @@ def create_app(config_path: str) -> FastAPI:
     @app.post("/grade", response_model=GradeResponse)
     async def grade(req: GradeRequest) -> GradeResponse:
         results = await server.grade(req.items)
+        if server.verbose:
+            paired = list(zip(results, req.items))
+
+            def _sid(res: GradeResultOut) -> str:
+                return (
+                    f"{res.sample_id}"
+                    f"{'' if res.completion_index is None else f'#{res.completion_index}'}"
+                )
+
+            print(f"[dataserver] iteration={req.iteration} graded {len(results)} completions.")
+            print("  ---- ALL REWARDS ----")
+            for res, _item in paired:
+                print(f"    - {_sid(res)} = {res.reward:.3f}")
+
+            if paired:
+                best_res, best_item = max(paired, key=lambda x: x[0].reward)
+                worst_res, worst_item = min(paired, key=lambda x: x[0].reward)
+
+                print("  ---- BEST ----")
+                print(f"    {_sid(best_res)} = {best_res.reward:.3f}")
+                print("    completion:")
+                print(best_item.completion)
+
+                print("  ---- WORST ----")
+                print(f"    {_sid(worst_res)} = {worst_res.reward:.3f}")
+                print("    completion:")
+                print(worst_item.completion)
         return GradeResponse(
             results=[
                 GradeResultOut(
