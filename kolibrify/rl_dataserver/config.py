@@ -101,6 +101,12 @@ def load_config(path: str) -> RLDataConfig:
     stages: List[StageConfig] = []
     for stage_raw in raw.get("stages", []):
         datasets_raw = stage_raw.get("datasets") or []
+        for dataset_raw in datasets_raw:
+            dataset_id = dataset_raw["id"]
+            if dataset_id not in datasets:
+                raise ConfigError(
+                    f"Stage '{stage_raw['name']}' references unknown dataset '{dataset_id}'"
+                )
         stage_datasets = [
             StageDatasetConfig(id=d["id"], weight=float(d["weight"])) for d in datasets_raw
         ]
