@@ -48,6 +48,7 @@ class SampleResponse(BaseModel):
 class GradeItem(BaseModel):
     sample_id: str
     completion: str
+    completion_index: int | None = None
 
 
 class GradeRequest(BaseModel):
@@ -58,6 +59,7 @@ class GradeRequest(BaseModel):
 class GradeResultOut(BaseModel):
     sample_id: str
     reward: float
+    completion_index: int | None = None
 
 
 class GradeResponse(BaseModel):
@@ -133,7 +135,12 @@ class RLDataServer:
                 raise HTTPException(status_code=400, detail=f"Index out of range for dataset {dataset_id}")
             record = dataset[idx]
             grouped.setdefault(dataset_id, []).append(
-                GraderInput(sample_id=item.sample_id, record=record, completion=item.completion)
+                GraderInput(
+                    sample_id=item.sample_id,
+                    record=record,
+                    completion=item.completion,
+                    completion_index=item.completion_index,
+                )
             )
 
         results: List[GradeResult] = []
@@ -176,7 +183,16 @@ def create_app(config_path: str) -> FastAPI:
     @app.post("/grade", response_model=GradeResponse)
     async def grade(req: GradeRequest) -> GradeResponse:
         results = await server.grade(req.items)
-        return GradeResponse(results=[GradeResultOut(sample_id=r.sample_id, reward=r.reward) for r in results])
+        return GradeResponse(
+            results=[
+                GradeResultOut(
+                    sample_id=r.sample_id,
+                    reward=r.reward,
+                    completion_index=r.completion_index,
+                )
+                for r in results
+            ]
+        )
 
     return app
 

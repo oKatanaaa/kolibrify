@@ -16,12 +16,14 @@ class GraderInput:
     sample_id: str
     record: Mapping[str, object]
     completion: str
+    completion_index: int | None = None
 
 
 @dataclass
 class GradeResult:
     sample_id: str
     reward: float
+    completion_index: int | None = None
 
 
 class Grader:
@@ -47,7 +49,13 @@ class JsonValidGrader(Grader):
                                 reward = 0.0
             except Exception:
                 reward = 0.0
-            results.append(GradeResult(sample_id=item.sample_id, reward=reward))
+            results.append(
+                GradeResult(
+                    sample_id=item.sample_id,
+                    reward=reward,
+                    completion_index=item.completion_index,
+                )
+            )
         return results
 
 
@@ -69,7 +77,13 @@ class MathExactGrader(Grader):
             if completion_match and answer_match:
                 if completion_match.group(0) == answer_match.group(0):
                     reward = 1.0
-            results.append(GradeResult(sample_id=item.sample_id, reward=reward))
+            results.append(
+                GradeResult(
+                    sample_id=item.sample_id,
+                    reward=reward,
+                    completion_index=item.completion_index,
+                )
+            )
         return results
 
 
@@ -91,6 +105,7 @@ class ExternalHttpGrader(Grader):
                     "answer": item.record.get("answer") if isinstance(item.record, Mapping) else None,
                     "metadata": item.record.get("metadata") if isinstance(item.record, Mapping) else None,
                     "completion": item.completion,
+                    "completion_index": item.completion_index,
                 }
                 for item in inputs
             ]
@@ -100,7 +115,13 @@ class ExternalHttpGrader(Grader):
         data = response.json()
         results: List[GradeResult] = []
         for res in data.get("results", []):
-            results.append(GradeResult(sample_id=res["sample_id"], reward=float(res["reward"])))
+            results.append(
+                GradeResult(
+                    sample_id=res["sample_id"],
+                    reward=float(res["reward"]),
+                    completion_index=res.get("completion_index"),
+                )
+            )
         return results
 
     async def aclose(self) -> None:
@@ -128,11 +149,18 @@ class DatasetReward:
         grader_outputs = await asyncio.gather(
             *[grader.grade_batch(inputs) for grader in self.graders]
         )
-        combined: Dict[str, float] = {item.sample_id: 0.0 for item in inputs}
+        combined: List[float] = [0.0 for _ in inputs]
         for weight, results in zip(self.weights, grader_outputs):
-            for res in results:
-                combined[res.sample_id] += weight * res.reward
-        return [GradeResult(sample_id=item.sample_id, reward=combined[item.sample_id]) for item in inputs]
+            for idx, res in enumerate(results):
+                combined[idx] += weight * res.reward
+        return [
+            GradeResult(
+                sample_id=item.sample_id,
+                reward=combined[idx],
+                completion_index=item.completion_index,
+            )
+            for idx, item in enumerate(inputs)
+        ]
 
 
 def build_graders(config: DatasetConfig, grader_registry: Dict[str, Grader]) -> DatasetReward:
