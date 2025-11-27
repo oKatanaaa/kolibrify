@@ -88,20 +88,20 @@ def common_training_setup(
     
     return model, tokenizer, train_data, val_data, data_iterations
 
-def apply_lora_adapter(model, config):
+def apply_lora_adapter(model, config, gradient_checkpointing: str | bool = "unsloth"):
     """Apply LoRA adapter to model with given configuration."""
     from unsloth import FastLanguageModel
-    
+
     print("Applying LoRA adapter...")
     return FastLanguageModel.get_peft_model(
-        model, 
+        model,
         r=config.lora_r,
         lora_alpha=config.lora_alpha,
         target_modules=config.lora_target_modules,
         modules_to_save=config.modules_to_save,
         lora_dropout=config.lora_dropout,
         bias="none",
-        use_gradient_checkpointing="unsloth",
+        use_gradient_checkpointing=gradient_checkpointing,
         max_seq_length=config.max_ctx_len,
         random_state=322,
         use_rslora=config.use_rslora
