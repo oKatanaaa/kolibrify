@@ -50,16 +50,15 @@ def main(config_path):
     free_mem()
     print("Model loaded.")
 
-    if not config.model.continued_training:
-        model = apply_lora_adapter(
-            model,
-            config.model,
-            gradient_checkpointing=config.model.gradient_checkpointing,
-        )
+    model = apply_lora_adapter(
+        model,
+        config.model,
+        gradient_checkpointing=config.model.gradient_checkpointing,
+    )
 
-        if config.model.cpu_offload_embeddings:
-            cpu_offload_embeddings(model, config.model)
-            free_mem()
+    if config.model.cpu_offload_embeddings:
+        cpu_offload_embeddings(model, config.model)
+        free_mem()
 
     model.print_trainable_parameters()
 
