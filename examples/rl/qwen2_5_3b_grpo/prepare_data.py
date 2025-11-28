@@ -8,7 +8,7 @@ SYSTEM_PROMPT = """Respond in the following format:
 <think>
 step-by-step reasoning about the problem
 </think>
-answer
+final answer
 """
 
 

@@ -69,6 +69,7 @@ class RemoteRLDataset(torch.utils.data.Dataset):
         )
 
     def __len__(self) -> int:
+        # TODO: Reconcile iteration length with optimizer steps (grad accumulation/world size) to avoid resampling stage 0.
         return self.total_iterations * self.batch_size
 
     def _rows_for_iteration(self, iteration: int) -> List[Dict]:
