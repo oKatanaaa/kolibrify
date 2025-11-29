@@ -238,24 +238,39 @@ def create_app(config_path: str, verbose: bool = False) -> FastAPI:
                     f"{'' if res.completion_index is None else f'#{res.completion_index}'}"
                 )
 
-            print(f"[dataserver] iteration={req.iteration} graded {len(results)} completions.")
-            print("  ---- ALL REWARDS ----")
-            for res, _item in paired:
-                print(f"    - {_sid(res)} = {res.reward:.3f}")
+            rewards = [res.reward for res, _ in paired]
+            if rewards:
+                summary = (
+                    f"[dataserver] iteration={req.iteration} graded {len(results)} | "
+                    f"avg={sum(rewards)/len(rewards):.3f} "
+                    f"min={min(rewards):.3f} "
+                    f"max={max(rewards):.3f}"
+                )
+            else:
+                summary = f"[dataserver] iteration={req.iteration} graded 0 completions."
+            print(summary)
+
+            if paired:
+                print("  rewards:")
+                for res, _item in paired:
+                    print(f"    {_sid(res):<32} {res.reward:>6.3f}")
 
             if paired:
                 best_res, best_item = max(paired, key=lambda x: x[0].reward)
                 worst_res, worst_item = min(paired, key=lambda x: x[0].reward)
 
-                print("  ---- BEST ----")
-                print(f"    {_sid(best_res)} = {best_res.reward:.3f}")
-                print("    completion:")
-                print(best_item.completion)
+                def _block(title: str, res: GradeResultOut, completion: str | None) -> None:
+                    print(f"\n-------- {title} --------")
+                    print(f"    {_sid(res):<32} {res.reward:>6.3f}")
+                    print("    completion:")
+                    if completion is None:
+                        print("      <none>")
+                    else:
+                        # Extra newline to visually separate multi-line completions.
+                        print(f"{completion.strip()}")
 
-                print("  ---- WORST ----")
-                print(f"    {_sid(worst_res)} = {worst_res.reward:.3f}")
-                print("    completion:")
-                print(worst_item.completion)
+                _block("BEST", best_res, best_item.completion)
+                _block("WORST", worst_res, worst_item.completion)
         return GradeResponse(
             results=[
                 GradeResultOut(

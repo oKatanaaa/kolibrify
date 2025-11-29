@@ -1,4 +1,5 @@
 from collections.abc import Mapping
+import time
 
 import requests
 
@@ -18,9 +19,33 @@ def _completion_to_text(completion) -> str:
         return ""
 
 
-def build_remote_reward_fn(server_url: str):
+def build_remote_reward_fn(
+    server_url: str,
+    *,
+    request_timeout_seconds: float = 60.0,
+    max_retries: int = 3,
+    retry_backoff_seconds: float = 1.0,
+):
     session = requests.Session()
     iteration_counter = {"value": 0}
+
+    def _with_retries(fn, op_name: str):
+        nonlocal session
+        last_error = None
+        for attempt in range(max_retries + 1):
+            try:
+                return fn()
+            except Exception as e:
+                last_error = e
+                if attempt < max_retries:
+                    delay = retry_backoff_seconds * (2**attempt)
+                    print(f"{op_name} failed (attempt {attempt + 1}/{max_retries + 1}): {e}. Retrying in {delay:.1f}s...")
+                    time.sleep(delay)
+                    session = requests.Session()
+                else:
+                    print(f"{op_name} failed after {max_retries + 1} attempts: {e}")
+        if last_error:
+            raise last_error
 
     def reward_fn(completions, **kwargs):
         # TRL passes dataset columns as keyword lists (e.g., sample_id=[...]).
@@ -82,13 +107,16 @@ def build_remote_reward_fn(server_url: str):
         rewards = [0.0 for _ in completions_flat]
 
         try:
-            response = session.post(
-                f"{server_url.rstrip('/')}/grade",
-                json=payload,
-                timeout=60,
-            )
-            response.raise_for_status()
-            data = response.json()
+            def _post_grade():
+                response = session.post(
+                    f"{server_url.rstrip('/')}/grade",
+                    json=payload,
+                    timeout=request_timeout_seconds,
+                )
+                response.raise_for_status()
+                return response.json()
+
+            data = _with_retries(_post_grade, f"Grading iteration {iteration_counter['value']}")
             reward_map = {}
             for item in data.get("results", []):
                 if "completion_index" in item:

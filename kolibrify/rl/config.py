@@ -53,11 +53,19 @@ class RLTrainingConfig:
 @dataclass
 class RLAlgorithmConfig:
     rl_algorithm: str = "grpo"
+    num_iterations: int = 1
+    epsilon: float = 0.2
+    scale_rewards: str = "group"
+    loss_type: str = "grpo"
 
 
 @dataclass
 class RLDataConfig:
     server_url: str
+    request_timeout_seconds: float = 60.0
+    meta_timeout_seconds: float = 30.0
+    max_retries: int = 3
+    retry_backoff_seconds: float = 1.0
 
 
 @dataclass

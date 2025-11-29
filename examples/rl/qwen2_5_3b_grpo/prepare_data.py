@@ -4,11 +4,12 @@ from pathlib import Path
 from datasets import load_dataset
 
 
-SYSTEM_PROMPT = """Respond in the following format:
+SYSTEM_PROMPT = """You will be given a math problem. Write the solution in the following format:
 <think>
-step-by-step reasoning about the problem
+step-by-step reasoning
 </think>
-final answer
+
+Put the answer to the problem after the </think> tag. The answer must be a single number.
 """
 
 

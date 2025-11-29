@@ -44,9 +44,17 @@ training:
 
 rl:
   rl_algorithm: grpo
+  num_iterations: 1
+  epsilon: 0.2
+  scale_rewards: group
+  loss_type: grpo
 
 data:
   server_url: "http://localhost:9000"
+  request_timeout_seconds: 60
+  meta_timeout_seconds: 30
+  max_retries: 3
+  retry_backoff_seconds: 1.0
 
 paths:
   output_dir: "experiments_rl"

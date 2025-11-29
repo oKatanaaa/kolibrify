@@ -61,29 +61,47 @@ class ReasoningFormatGrader(Grader):
 
     @staticmethod
     def _score(text: str) -> float:
-        import re
-
-        perfect_pattern = r"^<think>\n[\s\S]*?\n</think>\n[\s\S]+$"
-        if re.match(perfect_pattern, text):
-            return 1.0
-
         score = 0.0
         open_idx = text.find("<think>")
         close_idx = text.find("</think>")
+        open_count = len(re.findall(r"<think>", text))
+        close_count = len(re.findall(r"</think>", text))
 
         if open_idx != -1:
-            score += 0.25
-        if close_idx != -1:
-            score += 0.25
-        if open_idx != -1 and close_idx != -1 and close_idx > open_idx:
-            score += 0.25
+            score += 0.125
+            if open_idx == 0:
+                score += 0.125
 
         if close_idx != -1:
-            after = text[close_idx + len("</think>") :].strip()
+            score += 0.125
+            if open_idx != -1 and close_idx > open_idx:
+                score += 0.125
+            elif open_idx != -1 and close_idx < open_idx:
+                # Penalize reversed ordering of reasoning tags.
+                score -= 0.125
+
+        if close_idx != -1:
+            after_raw = text[close_idx + len("</think>") :]
+            # Penalize a space instead of a newline, or no divider (text glued to </think>).
+            divider = after_raw[:1]
+            if divider:
+                if divider.isspace():
+                    if divider == " ":
+                        score -= 0.1
+                else:
+                    score -= 0.1
+            after = after_raw.strip()
             if after:
-                score += 0.25
+                score += 0.5
+            else:
+                # Penalize missing final answer after the reasoning block.
+                score -= 0.25
 
-        return min(score, 0.99)
+        if open_count > 1 or close_count > 1:
+            # Penalize multiple reasoning blocks so a single block is preferred.
+            score -= 0.15 * ((open_count - 1) + (close_count - 1))
+
+        return max(0.0, min(score, 1.00))
 
 
 class JsonValidGrader(Grader):
@@ -122,8 +140,17 @@ class MathExactGrader(Grader):
         results: List[GradeResult] = []
         for item in inputs:
             response = item.answer
-            if response is None:
-                response = item.completion
+            # Penalize cases when the response is malformed (nothing comes after </think> tag)
+            if response is None or len(response.strip()) == 0:
+                results.append(
+                    GradeResult(
+                        sample_id=item.sample_id,
+                        reward=0.0,
+                        completion_index=item.completion_index,
+                    )
+                )
+                continue
+
             numbers = _number_re.findall(response or "")
             answer = None
             if isinstance(item.record, Mapping):
@@ -135,8 +162,7 @@ class MathExactGrader(Grader):
             if numbers and answer_match:
                 gold = answer_match.group(0)
                 if any(num == gold for num in numbers):
-                    reward = 0.5
-                reward += ratio(str(answer), response) / 2
+                    reward = 1.0
             results.append(
                 GradeResult(
                     sample_id=item.sample_id,
@@ -151,17 +177,33 @@ class NumberOnlyGrader(Grader):
     async def grade_batch(self, inputs: Sequence[GraderInput]) -> List[GradeResult]:
         results: List[GradeResult] = []
 
-        def is_number_only(text: str) -> bool:
-            if text is None:
-                return False
-            stripped = text.strip()
-            if not stripped:
-                return False
-            return re.fullmatch(r"[-+]?\d*\.?\d+", stripped) is not None
-
         for item in inputs:
-            candidate = item.answer if item.answer is not None else item.completion
-            reward = 1.0 if is_number_only(candidate) else 0.0
+            candidate = item.answer
+            if candidate is None:
+                reward = 0.0
+            else:
+                normalized = candidate.strip()
+                match = _number_re.search(normalized)
+                # The first matched number anchors our scoring; surrounding text and extra numbers reduce the reward.
+                if not normalized or match is None:
+                    reward = 0.0
+                else:
+                    extra_ch_count = len(normalized) - len(match.group(0))
+                    reward = 1 / (1 + extra_ch_count)
+                    if extra_ch_count == 0:
+                        reward = 1.0
+                    elif extra_ch_count < 10:
+                        reward = 0.5
+                    elif extra_ch_count < 20:
+                        reward = 0.4
+                    elif extra_ch_count < 30:
+                        reward = 0.3
+                    elif extra_ch_count < 40:
+                        reward = 0.2
+                    elif extra_ch_count < 50:
+                        reward = 0.1
+                    else:
+                        reward = 0.0
             results.append(
                 GradeResult(
                     sample_id=item.sample_id,

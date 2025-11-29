@@ -9,11 +9,11 @@ datasets:
       - number_only
     grader_weights:
       - 2.0
-      - 0.5
+      - 1.0
 
 stages:
   - name: main
-    until_step: 250
+    until_step: 100
     datasets:
       - id: gsm8k
         weight: 1.0

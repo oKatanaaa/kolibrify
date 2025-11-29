@@ -1,6 +1,7 @@
-import json
 import argparse
+import json
 import os
+import pathlib
 import sys
 import time
 from types import SimpleNamespace
@@ -290,40 +291,48 @@ def main(config_path, checkpoint, temperature, top_p, max_output_tokens, gpu_id,
     """Main entry point for the chat interface"""
     # Set CUDA device
     os.environ['CUDA_VISIBLE_DEVICES'] = str(gpu_id)
+
+    resolved_config_path = pathlib.Path(config_path).expanduser().resolve()
+    config_dir = resolved_config_path.parent
     
     # Load configuration
-    with open(config_path) as f:
+    with resolved_config_path.open() as f:
         raw_cfg = yaml.safe_load(f)
 
     is_rl = isinstance(raw_cfg, dict) and "paths" in raw_cfg
     if is_rl:
-        _, config = load_rl_config(config_path)
+        _, config = load_rl_config(str(resolved_config_path))
         output_dir = config.paths.output_dir
         max_ctx_len = config.model.max_seq_length
     else:
-        _, config = load_training_config(config_path)
+        _, config = load_training_config(str(resolved_config_path))
         output_dir = config.output_dir
         max_ctx_len = config.max_ctx_len
 
-    base_output_dir = output_dir
-    checkpoint_dir = None
-    if checkpoint:
-        checkpoint_dir = os.path.join(base_output_dir, checkpoint)
+    base_output_dir = pathlib.Path(output_dir)
+    checkpoint_dir = base_output_dir / checkpoint if checkpoint else None
 
-    if not os.path.isabs(base_output_dir):
-        base_output_dir = os.path.join(os.path.dirname(os.path.abspath(config_path)), base_output_dir)
-    if checkpoint_dir and not os.path.isabs(checkpoint_dir):
-        checkpoint_dir = os.path.join(os.path.dirname(os.path.abspath(config_path)), checkpoint_dir)
+    if not base_output_dir.is_absolute():
+        base_output_dir = (config_dir / base_output_dir).resolve()
+    if checkpoint_dir and not checkpoint_dir.is_absolute():
+        checkpoint_dir = (config_dir / checkpoint_dir).resolve()
 
     # Prefer checkpoint dir if provided, but keep base for fallback
     output_dir_for_chat = checkpoint_dir or base_output_dir
 
+    default_context_path = None
+    if default_context:
+        ctx_path = pathlib.Path(default_context).expanduser()
+        if not ctx_path.is_absolute():
+            ctx_path = config_dir / ctx_path
+        default_context_path = str(ctx_path.resolve())
+
     # Minimal shim so load_chat_model can stay unchanged
     config_for_chat = SimpleNamespace(
-        output_dir=output_dir_for_chat,
+        output_dir=str(output_dir_for_chat),
         max_ctx_len=max_ctx_len,
-        base_output_dir=base_output_dir,
-        checkpoint_dir=checkpoint_dir,
+        base_output_dir=str(base_output_dir),
+        checkpoint_dir=str(checkpoint_dir) if checkpoint_dir else None,
     )
     
     # Load model directly using VllmModel
@@ -341,7 +350,7 @@ def main(config_path, checkpoint, temperature, top_p, max_output_tokens, gpu_id,
             model=model,
             temperature=temperature,
             top_p=top_p,
-            default_context_path=default_context
+            default_context_path=default_context_path
         )
     except KeyboardInterrupt:
         print("\nChat session ended by user.")

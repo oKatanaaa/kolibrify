@@ -1,6 +1,7 @@
 import argparse
 import copy
 import os
+import pathlib
 import torch
 import yaml
 
@@ -29,8 +30,18 @@ def main(config_path):
     setup_seeds()
     ensure_c_compiler()
 
+    resolved_config_path = pathlib.Path(config_path).expanduser().resolve()
+    config_dir = resolved_config_path.parent
+
     print("Loading configuration...")
-    config_dict, config = load_rl_config(config_path)
+    config_dict, config = load_rl_config(str(resolved_config_path))
+
+    output_dir = pathlib.Path(config.paths.output_dir)
+    if not output_dir.is_absolute():
+        output_dir = (config_dir / output_dir).resolve()
+    config.paths.output_dir = str(output_dir)
+    config_dict.setdefault("paths", {})["output_dir"] = str(output_dir)
+
     print(config)
 
     print(f"Creating output directory: {config.paths.output_dir}")
@@ -72,16 +83,28 @@ def main(config_path):
     rl_dataset = create_rl_dataset(
         server_url=config.data.server_url,
         per_device_batch_size=config.training.per_device_train_batch_size,
+        gradient_accumulation_steps=config.training.gradient_accumulation_steps,
+        max_retries=config.data.max_retries,
+        retry_backoff_seconds=config.data.retry_backoff_seconds,
+        request_timeout_seconds=config.data.request_timeout_seconds,
+        meta_timeout_seconds=config.data.meta_timeout_seconds,
     )
 
     print("Preparing reward function...")
-    reward_fn = build_remote_reward_fn(config.data.server_url)
+    reward_fn = build_remote_reward_fn(
+        config.data.server_url,
+        request_timeout_seconds=config.data.request_timeout_seconds,
+        max_retries=config.data.max_retries,
+        retry_backoff_seconds=config.data.retry_backoff_seconds,
+    )
 
     importance_sampling_level = "token"
     if config.rl.rl_algorithm.lower() == "gspo":
         importance_sampling_level = "sequence"
 
     print("Creating GRPO config...")
+    shuffle_dataset = False  # Iteration mapping assumes deterministic ordering of samples.
+    assert shuffle_dataset is False, "RL dataserver iteration mapping relies on shuffle_dataset=False"
     training_args = GRPOConfig(
         output_dir=config.paths.output_dir,
         per_device_train_batch_size=config.training.per_device_train_batch_size,
@@ -103,7 +126,11 @@ def main(config_path):
         bf16=torch.cuda.is_bf16_supported(),
         gradient_checkpointing=bool(config.model.gradient_checkpointing),
         importance_sampling_level=importance_sampling_level,
-        shuffle_dataset=False,
+        shuffle_dataset=shuffle_dataset,
+        num_iterations=config.rl.num_iterations,
+        epsilon=config.rl.epsilon,
+        scale_rewards=config.rl.scale_rewards,
+        loss_type=config.rl.loss_type,
     )
 
     print("Initializing GRPO Trainer...")
