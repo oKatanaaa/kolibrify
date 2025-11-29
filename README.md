@@ -21,6 +21,7 @@ Kolibrify leverages the power of [Unsloth](https://github.com/unslothai/unsloth)
 Kolibrify is equipped with four primary scripts for training, merging and testing fine-tuned models: 
 - `kolibrify-sft` - supervised finetuning.
 - `kolibrify-dpo` - direct preference optimization.
+- `kolibrify-rl-dataserver` / `kolibrify-rl-train` - RL pipeline (GRPO/GSPO) with a dataserver that samples/grades prompts and a trainer that talks to it.
 - `kolibrify-merge` - merging lora adapters.
 - `kolibrify-predict` - generating predictions using a finetuned model.
 - `kolibrify-eval-ifeval` - evaluating a finetuned model using instruction-following eval.
@@ -58,6 +59,23 @@ kolibrify-dpo training_config.yaml
 
 > [!NOTE]
 > See `examples` folder for a full example of finetuning Mistral model with Kolibrify on Dolphin dataset.
+
+#### Reinforcement learning (GRPO/GSPO)
+
+Kolibrify’s RL pipeline has two processes: an RL dataserver that owns sampling + grading and a trainer that runs GRPO/GSPO against it. Full details live in `docs/RL.md`; a minimal flow:
+
+```bash
+# 1) Start the dataserver (loads datasets, applies graders, serves batches)
+kolibrify-rl-dataserver rl_data_config.yaml --host 127.0.0.1 --port 9000
+
+# 2) Run the trainer that queries the dataserver and performs GRPO/GSPO
+kolibrify-rl-train rl_training_config.yaml
+```
+
+- `rl_data_config.yaml`: Dataserver config describing datasets, stages/curriculum, and any extra graders. Paths in the config are resolved relative to the file location.
+- `rl_training_config.yaml`: Training config pointing at the dataserver URL and setting model/hyperparameters. Outputs save to `paths.output_dir/<config-name>/`; pass `model.merge: true` to write a merged checkpoint to `merged/`.
+
+See `examples/rl/` for end-to-end configs and more notes.
 
 ### Merging LoRA Parameters
 
