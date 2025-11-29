@@ -69,7 +69,8 @@ def _normalize_weights(items: List[StageDatasetConfig]) -> List[StageDatasetConf
 
 
 def load_config(path: str) -> RLDataConfig:
-    config_path = pathlib.Path(path)
+    config_path = pathlib.Path(path).expanduser().resolve()
+    config_dir = config_path.parent
     with config_path.open("r") as f:
         raw = yaml.safe_load(f)
 
@@ -79,7 +80,12 @@ def load_config(path: str) -> RLDataConfig:
     if "paths" not in raw or "data_root" not in raw["paths"]:
         raise ConfigError("'paths.data_root' is required in the config")
 
-    paths = PathsConfig(data_root=pathlib.Path(raw["paths"]["data_root"]))
+    raw_data_root = pathlib.Path(raw["paths"]["data_root"])
+    if raw_data_root.is_absolute():
+        data_root = raw_data_root
+    else:
+        data_root = config_dir / raw_data_root
+    paths = PathsConfig(data_root=data_root)
 
     external_graders: Dict[str, ExternalGraderConfig] = {}
     for name, cfg in (raw.get("external_graders") or {}).items():
@@ -91,8 +97,11 @@ def load_config(path: str) -> RLDataConfig:
 
     datasets: Dict[str, DatasetConfig] = {}
     for dataset_id, cfg in (raw.get("datasets") or {}).items():
+        dataset_path = pathlib.Path(cfg["path"])
+        if not dataset_path.is_absolute():
+            dataset_path = paths.data_root / dataset_path
         dataset_cfg = DatasetConfig(
-            path=paths.data_root / cfg["path"],
+            path=dataset_path,
             graders=list(cfg.get("graders") or []),
             grader_weights=[float(w) for w in (cfg.get("grader_weights") or [])],
         )
