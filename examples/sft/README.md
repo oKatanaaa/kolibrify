@@ -23,9 +23,9 @@ Here's a quick guide to some key parameters in the `dolphin-mistral-test.yaml` c
 
 #### `stages`
 
-This parameter defines the 'training stages'. These stages represent different dataset mixtures that are processed sequentially by the model.
+This parameter defines the 'training stages'. These stages represent different dataset mixtures that are processed sequentially by the model. Each stage runs until its cumulative `until_step`, and within a stage the listed datasets are sampled proportionally to their `weight`.
 
-For the current configuration, the model first trains on "dolphin_gpt3_small.jsonl" for two epochs without mixing with "dolphin_gpt4_small.jsonl". Then, it trains on "dolphin_gpt4_small.jsonl", similar to the training methodology of the Orca model as described in [this paper](https://arxiv.org/pdf/2306.02707). However, unlike the paper's approach, kolibrify maintains gradient information across training stages, treating the data as a continuous dataset.
+For the current configuration, the model first samples only from "dolphin_gpt3_small.jsonl" until step 2000, then from "dolphin_gpt4_small.jsonl" until step 4000—similar in spirit to the Orca curriculum described in [this paper](https://arxiv.org/pdf/2306.02707). Unlike the paper's approach, kolibrify maintains gradient information across stages, treating training as a continuous stream.
 
 > [!NOTE]
 > You can add multiple datasets within a single stage, they will be mixed together.

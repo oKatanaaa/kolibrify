@@ -44,7 +44,10 @@ def main(config_path):
     
     # Calculate training steps
     total_batch_size = config.micro_batch_size * config.gradient_accumulation_steps
-    training_steps = data_iterations // total_batch_size
+    training_steps = config.stages[-1].until_step
+    expected_iterations = training_steps * total_batch_size
+    if data_iterations != expected_iterations:
+        print(f"WARNING: Data iterations ({data_iterations}) do not match expected iterations ({expected_iterations}).")
     print(f'Total training steps: {training_steps}')
     
     # Create SFT-specific training arguments
