@@ -9,13 +9,13 @@ from kolibrify.core import BaseConfig
 @dataclass
 class DatasetConfig:
     path: str
-    n_samples: int = -1
+    weight: float = 1.0
 
 
 @dataclass
 class StageConfig:
     name: str
-    epochs: float
+    until_step: int
     datasets: List[DatasetConfig]
 
 
@@ -27,23 +27,26 @@ class TrainingConfig(BaseConfig):
 def load_stage_configs(stage_dicts: list) -> List[StageConfig]:
     stages = []
     for stage_dict in stage_dicts:
-        stage_name = list(stage_dict.keys())[0]
-        stage_dict = stage_dict[stage_name]
-        epochs = stage_dict['epochs']
+        stage_name = stage_dict['name']
+        until_step = stage_dict['until_step']
         dataset_dicts = stage_dict['datasets']
         dataset_configs = []
         for dataset_dict in dataset_dicts:
-            v = list(dataset_dict.values())[0]
-            if isinstance(v, str):
-                # Only path is provided
-                dataset_configs.append(DatasetConfig(v))
+            # Accept either a simple path string or a dictionary with details.
+            if isinstance(dataset_dict, str):
+                dataset_configs.append(DatasetConfig(path=dataset_dict))
                 continue
-            
-            path = v['path']
-            n_samples = v.get('n_samples', -1)
-            dataset_configs.append(DatasetConfig(path, n_samples))
+
+            # Support short-form {some_label: "path"} while transitioning configs.
+            if 'path' not in dataset_dict and len(dataset_dict) == 1:
+                path_val = list(dataset_dict.values())[0]
+                dataset_dict = {'path': path_val}
+
+            path = dataset_dict['path']
+            weight = dataset_dict.get('weight', 1.0)
+            dataset_configs.append(DatasetConfig(path=path, weight=weight))
         
-        stage = StageConfig(stage_name, epochs, dataset_configs)
+        stage = StageConfig(stage_name, until_step, dataset_configs)
         stages.append(stage)
     return stages
 

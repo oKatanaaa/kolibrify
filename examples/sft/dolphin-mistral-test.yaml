@@ -3,14 +3,16 @@ continued_training: False
 access_token: null
 output_dir: "dolphin-mistral-test"
 stages:
-  - gpt3:
-      epochs: 2
-      datasets:
-        - dolphin_gpt3: "dolphin_gpt3_small.jsonl"
-  - gpt4:
-      epochs: 2
-      datasets:
-        - dolphin_gpt4: "dolphin_gpt4_small.jsonl"
+  - name: gpt3
+    until_step: 2000
+    datasets:
+      - path: "dolphin_gpt3_small.jsonl"
+        weight: 1.0
+  - name: gpt4
+    until_step: 4000
+    datasets:
+      - path: "dolphin_gpt4_small.jsonl"
+        weight: 1.0
 val_dataset_file: null
 lora_r: 32
 lora_alpha: 64

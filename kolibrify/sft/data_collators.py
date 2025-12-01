@@ -8,7 +8,6 @@ def get_data_collator(tokenizer, mask_assistant_responses=True):
         print("Loss for user responses won't be masked during training.")
 
     return DataCollatorForLanguageModeling(
-        tokenizer=tokenizer,
         pad_token_id=tokenizer.pad_token_id,
         completion_only_loss=mask_assistant_responses,
     )

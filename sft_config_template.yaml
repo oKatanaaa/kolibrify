@@ -3,19 +3,21 @@ continued_training: False  # Set to True to continue training from an existing a
 access_token: null  # Your HuggingFace access token for private models
 output_dir: "experiments"  # Base directory where training outputs will be saved (config filename will be appended automatically)
 
-# Curriculum learning stages - define multiple training phases with different datasets
+# Curriculum learning stages - define multiple training phases with different datasets.
+# Each stage runs until `until_step`; steps are cumulative across stages.
 stages:
-  - stage1:  # First training stage
-      epochs: 1.0  # Number of epochs to train on this stage's datasets
-      datasets: 
-        - dataset1:  # First dataset in this stage
-            path: path to dataset 1  # Path to the JSONL dataset file
-            n_samples: 800  # Number of samples to use (-1 for all samples)
-        - dataset2: path to dataset 2  # You can provide just the path for using all samples
-  - stage2:  # Second training stage
-      epochs: 0.5  # Can use fractional epochs for very large datasets
-      datasets:
-        - dataset3: path to dataset 3  # Path to another dataset
+  - name: stage1  # First training stage
+    until_step: 1000  # Train until this global step count is reached
+    datasets:
+      - path: path to dataset 1  # Path to the JSONL dataset file
+        weight: 1.0  # Sampling weight for this dataset relative to others in the stage
+      - path: path to dataset 2
+        weight: 0.5
+  - name: stage2  # Second training stage
+    until_step: 1500
+    datasets:
+      - path: path to dataset 3
+        weight: 1.0
 
 val_dataset_file: null  # Optional path to validation dataset
 
