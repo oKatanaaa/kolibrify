@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "kolibrify"
 dynamic = ["version"]
 dependencies = [
-  "unsloth == 2025.11.3",
+  "unsloth == 2025.11.4",
   "datasets == 4.3.0",
   "transformers == 4.57.2",
   "trl == 0.24.0",
