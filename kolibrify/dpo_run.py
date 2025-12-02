@@ -89,7 +89,7 @@ def main(config_path):
     )
     
     # Run the training process
-    run_training(trainer, config)
+    run_training(trainer, config, tokenizer=tokenizer)
 
 
 def run():
