@@ -1,8 +1,9 @@
 import gc
 import os
+import json
 import torch
 from peft import PeftConfig
-from transformers import AutoTokenizer
+from transformers import AutoTokenizer, AutoConfig
 from unsloth import FastLanguageModel
 from unsloth.chat_templates import get_chat_template
 
@@ -25,6 +26,18 @@ def _load_tokenizer(model_name_or_path, hf_token=None):
         try:
             return AutoTokenizer.from_pretrained(model_name_or_path, token=hf_token)
         except Exception:
+            # If it's a PEFT adapter folder, try to recover the base model name.
+            adapter_cfg = os.path.join(model_name_or_path, "adapter_config.json")
+            if os.path.isfile(adapter_cfg):
+                try:
+                    with open(adapter_cfg, "r", encoding="utf-8") as f:
+                        cfg = json.load(f)
+                    base_name = cfg.get("base_model_name_or_path")
+                    if base_name:
+                        return AutoTokenizer.from_pretrained(base_name, token=hf_token)
+                except Exception:
+                    pass
+            # Fall through to the default behavior below.
             pass
     return AutoTokenizer.from_pretrained(model_name_or_path, token=hf_token)
 
@@ -61,19 +74,29 @@ def vocab_has_imend(model_name, loading_lora, hf_token):
 
 def determine_new_vocab_size(model_name: str, hf_token: str, loading_lora: bool,
                              add_imstart_token: bool, map_eos: bool, new_tokens: list):
+    print(f"[vocab] loading_lora={loading_lora}, model={model_name}")
     # Always anchor on the tokenizer that lives next to the provided path (adapter or base).
     tok = _load_tokenizer(model_name, hf_token)
     existing_vocab = tok.get_vocab()
+    tokenizer_vocab_size = len(existing_vocab)
 
     # When loading a LoRA adapter, ensure the base model is resized exactly to this tokenizer size
     # (to avoid size mismatches when merging). Do not attempt incremental adds; the adapter already
     # knows its vocabulary.
     if loading_lora:
-        source_vocab_size = len(existing_vocab)
-        print(f'Source vocab size: {source_vocab_size}')
-        return source_vocab_size
+        print(f'Source vocab size: {tokenizer_vocab_size}')
+        return tokenizer_vocab_size
 
-    # For base loads, only add truly missing tokens.
+    # For base loads, start from max(config vocab, tokenizer vocab) to avoid shrinking embeddings.
+    try:
+        cfg = AutoConfig.from_pretrained(model_name, token=hf_token)
+        config_vocab_size = getattr(cfg, "vocab_size", tokenizer_vocab_size)
+    except Exception:
+        config_vocab_size = tokenizer_vocab_size
+
+    base_size = max(config_vocab_size, tokenizer_vocab_size)
+
+    # Only add truly missing tokens.
     missing = 0
     if add_imstart_token and '<|im_start|>' not in existing_vocab:
         missing += 1
@@ -86,12 +109,11 @@ def determine_new_vocab_size(model_name: str, hf_token: str, loading_lora: bool,
     if not map_eos and '<|im_end|>' not in existing_vocab:
         missing += 1
 
-    source_vocab_size = len(existing_vocab)
-    print(f'Source vocab size: {source_vocab_size}')
+    print(f'Source vocab size (tokenizer): {tokenizer_vocab_size}, config vocab size: {config_vocab_size}, base used: {base_size}')
 
     if missing == 0:
         return None
-    return source_vocab_size + missing
+    return base_size + missing
 
 
 def get_model(
