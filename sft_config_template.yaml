@@ -1,7 +1,7 @@
 model: "base_model_from_huggingface"  # Path or HF id of the base model to fine-tune
 continued_training: False  # Set to True to continue training from an existing adapter
 access_token: null  # Your HuggingFace access token for private models
-output_dir: "experiments"  # Base directory where training outputs will be saved (config filename will be appended automatically)
+output_dir: "experiments"  # Base directory where training outputs will be saved (relative to config file dir; config filename is appended automatically)
 
 # Curriculum learning stages - define multiple training phases with different datasets.
 # Each stage runs until `until_step`; steps are cumulative across stages.

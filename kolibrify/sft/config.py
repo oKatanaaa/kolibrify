@@ -52,17 +52,23 @@ def load_stage_configs(stage_dicts: list) -> List[StageConfig]:
 
 
 def load_training_config(config_path) -> tuple[dict, TrainingConfig]:
-    with open(config_path) as f:
+    config_abspath = os.path.abspath(config_path)
+    config_dir = os.path.dirname(config_abspath)
+
+    with open(config_abspath) as f:
         config = yaml.safe_load(f)
     
     _config = dict([(k, v) for k, v in config.items() if v is not None])
     
     # Extract the config filename (without extension) from the path
-    config_filename = os.path.splitext(os.path.basename(config_path))[0]
+    config_filename = os.path.splitext(os.path.basename(config_abspath))[0]
     
     # Update the output_dir to include the config filename
     assert 'output_dir' in _config
-    _config['output_dir'] = os.path.join(_config['output_dir'], config_filename)
+    output_dir = _config['output_dir']
+    if not os.path.isabs(output_dir):
+        output_dir = os.path.join(config_dir, output_dir)
+    _config['output_dir'] = os.path.join(output_dir, config_filename)
     # Also update the original config dict
     config['output_dir'] = _config['output_dir']
     
