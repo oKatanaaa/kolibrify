@@ -24,26 +24,39 @@ class TrainingConfig(BaseConfig):
     stages: List[StageConfig] = field(default_factory=lambda: [])
 
 
-def load_stage_configs(stage_dicts: list) -> List[StageConfig]:
+def _resolve_dataset_path(path: str, base_dir: str) -> str:
+    """Return an absolute path, resolving relative paths against the config file directory."""
+    expanded = os.path.expanduser(path)
+    if os.path.isabs(expanded):
+        return expanded
+    return os.path.join(base_dir, expanded)
+
+
+def load_stage_configs(stage_dicts: list, base_dir: str) -> List[StageConfig]:
     stages = []
     for stage_dict in stage_dicts:
         stage_name = stage_dict['name']
         until_step = stage_dict['until_step']
         dataset_dicts = stage_dict['datasets']
         dataset_configs = []
-        for dataset_dict in dataset_dicts:
+        for idx, dataset_dict in enumerate(dataset_dicts):
             # Accept either a simple path string or a dictionary with details.
             if isinstance(dataset_dict, str):
-                dataset_configs.append(DatasetConfig(path=dataset_dict))
+                path = _resolve_dataset_path(dataset_dict, base_dir)
+                dataset_dicts[idx] = path  # Persist resolved path back into the raw config for saving.
+                dataset_configs.append(DatasetConfig(path=path))
                 continue
 
             # Support short-form {some_label: "path"} while transitioning configs.
             if 'path' not in dataset_dict and len(dataset_dict) == 1:
                 path_val = list(dataset_dict.values())[0]
                 dataset_dict = {'path': path_val}
+                dataset_dicts[idx] = dataset_dict
 
-            path = dataset_dict['path']
+            path = _resolve_dataset_path(dataset_dict['path'], base_dir)
             weight = dataset_dict.get('weight', 1.0)
+            dataset_dict['path'] = path
+            dataset_dict.setdefault('weight', weight)
             dataset_configs.append(DatasetConfig(path=path, weight=weight))
         
         stage = StageConfig(stage_name, until_step, dataset_configs)
@@ -71,7 +84,16 @@ def load_training_config(config_path) -> tuple[dict, TrainingConfig]:
     _config['output_dir'] = os.path.join(output_dir, config_filename)
     # Also update the original config dict
     config['output_dir'] = _config['output_dir']
-    
+
+    # Resolve dataset paths relative to the config file so the config can be run from any CWD
+    stages = load_stage_configs(_config['stages'], base_dir=config_dir)
+    _config['stages'] = stages
+
+    if _config.get('val_dataset_file') is not None:
+        val_path = _resolve_dataset_path(_config['val_dataset_file'], config_dir)
+        _config['val_dataset_file'] = val_path
+        config['val_dataset_file'] = val_path
+
     # Check data integrity
     fields = TrainingConfig.__dataclass_fields__
     missing_keys = list(set(fields.keys()) - set(_config.keys()))
@@ -82,9 +104,6 @@ def load_training_config(config_path) -> tuple[dict, TrainingConfig]:
                 default_val = fields[k].default_factory()
             print(f'WARNING! Missing key: {k}. Setting to default value: {default_val}')
 
-    stages = load_stage_configs(_config['stages'])
-    _config['stages'] = stages
-    
     training_config = TrainingConfig(**_config)
     
     if training_config.add_imstart_token:

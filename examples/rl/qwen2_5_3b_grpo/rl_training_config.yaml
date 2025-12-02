@@ -58,4 +58,4 @@ data:
   retry_backoff_seconds: 2.0
 
 paths:
-  output_dir: "experiments_rl"
+  output_dir: "rl-example"

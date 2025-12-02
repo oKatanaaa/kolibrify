@@ -1,11 +1,8 @@
 import gc
-import os
-import json
 import torch
-from peft import PeftConfig
-from transformers import AutoTokenizer, AutoConfig
-from unsloth import FastLanguageModel
+from unsloth import FastLanguageModel, add_new_tokens
 from unsloth.chat_templates import get_chat_template
+from unsloth.tokenizer_utils import mean_of_trained_tokens
 
 from .config import BaseConfig
 
@@ -16,166 +13,52 @@ def free_mem():
 
 
 # Simplify the shit belows
-def _load_tokenizer(model_name_or_path, hf_token=None):
-    """
-    Prefer a local tokenizer next to the provided path (e.g., adapter dir),
-    otherwise fall back to loading from the model name / base path.
-    """
-    if os.path.isdir(model_name_or_path):
-        # If the path is a directory, try to load tokenizer from it directly.
-        try:
-            return AutoTokenizer.from_pretrained(model_name_or_path, token=hf_token)
-        except Exception:
-            # If it's a PEFT adapter folder, try to recover the base model name.
-            adapter_cfg = os.path.join(model_name_or_path, "adapter_config.json")
-            if os.path.isfile(adapter_cfg):
-                try:
-                    with open(adapter_cfg, "r", encoding="utf-8") as f:
-                        cfg = json.load(f)
-                    base_name = cfg.get("base_model_name_or_path")
-                    if base_name:
-                        return AutoTokenizer.from_pretrained(base_name, token=hf_token)
-                except Exception:
-                    pass
-            # Fall through to the default behavior below.
-            pass
-    return AutoTokenizer.from_pretrained(model_name_or_path, token=hf_token)
-
-
-def get_source_vocab_size(model_name, loading_lora, hf_token):
-    if loading_lora:
-        # When loading a LoRA adapter, prefer tokenizer inside the adapter path if present.
-        try:
-            tok = _load_tokenizer(model_name, hf_token)
-            return len(tok.get_vocab())
-        except Exception:
-            peft_config = PeftConfig.from_pretrained(model_name, token=hf_token)
-            _model_name = peft_config.base_model_name_or_path
-            tok = _load_tokenizer(_model_name, hf_token)
-            return len(tok.get_vocab())
-
-    tok = _load_tokenizer(model_name, hf_token)
-    return len(tok.get_vocab())
-
-
-def vocab_has_imend(model_name, loading_lora, hf_token):
-    if loading_lora:
-        try:
-            tok = _load_tokenizer(model_name, hf_token)
-        except Exception:
-            peft_config = PeftConfig.from_pretrained(model_name, token=hf_token)
-            _model_name = peft_config.base_model_name_or_path
-            tok = _load_tokenizer(_model_name, hf_token)
-        return '<|im_end|>' in tok.get_vocab()
-
-    tok = _load_tokenizer(model_name, hf_token)
-    return '<|im_end|>' in tok.get_vocab()
-
-
-def determine_new_vocab_size(model_name: str, hf_token: str, loading_lora: bool,
-                             add_imstart_token: bool, map_eos: bool, new_tokens: list):
-    print(f"[vocab] loading_lora={loading_lora}, model={model_name}")
-    # Always anchor on the tokenizer that lives next to the provided path (adapter or base).
-    tok = _load_tokenizer(model_name, hf_token)
-    existing_vocab = tok.get_vocab()
-    tokenizer_vocab_size = len(existing_vocab)
-
-    # When loading a LoRA adapter, ensure the base model is resized exactly to this tokenizer size
-    # (to avoid size mismatches when merging). Do not attempt incremental adds; the adapter already
-    # knows its vocabulary.
-    if loading_lora:
-        print(f'Source vocab size: {tokenizer_vocab_size}')
-        return tokenizer_vocab_size
-
-    # For base loads, start from max(config vocab, tokenizer vocab) to avoid shrinking embeddings.
-    try:
-        cfg = AutoConfig.from_pretrained(model_name, token=hf_token)
-        config_vocab_size = getattr(cfg, "vocab_size", tokenizer_vocab_size)
-    except Exception:
-        config_vocab_size = tokenizer_vocab_size
-
-    base_size = max(config_vocab_size, tokenizer_vocab_size)
-
-    # Only add truly missing tokens.
-    missing = 0
-    if add_imstart_token and '<|im_start|>' not in existing_vocab:
-        missing += 1
-
-    if new_tokens is not None:
-        for t in new_tokens:
-            if t not in existing_vocab:
-                missing += 1
-
-    if not map_eos and '<|im_end|>' not in existing_vocab:
-        missing += 1
-
-    print(f'Source vocab size (tokenizer): {tokenizer_vocab_size}, config vocab size: {config_vocab_size}, base used: {base_size}')
-
-    if missing == 0:
-        return None
-    return base_size + missing
-
-
 def get_model(
     model_name, load_in_4bit=True, 
     max_seq_length=4096, device_map='auto', 
     add_imstart_token=False, map_eos=True,
     hf_token=None, loading_lora=False, new_tokens=None
 ):
-    resize_model_vocab = determine_new_vocab_size(
-        model_name, hf_token, loading_lora, add_imstart_token, map_eos=map_eos, new_tokens=new_tokens
-    )
-    if resize_model_vocab is None:
-        print("Vocab won't be resized.")
-    else:
-        print("Model vocab will be resized to", resize_model_vocab)
-    
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name=model_name,
         load_in_4bit=load_in_4bit,
         max_seq_length=max_seq_length,
         device_map=device_map,
         token=hf_token,
-        resize_model_vocab=resize_model_vocab
     )
-    
-    tokenizer = update_tokenizer(tokenizer, add_imstart_token, map_eos, new_tokens)
+
+    tokenizer = update_tokenizer_and_model(
+        model,
+        tokenizer,
+        add_imstart_token=add_imstart_token,
+        map_eos=map_eos,
+        new_tokens=new_tokens,
+    )
     _update_model_eos_id(model, tokenizer)
 
     return model, tokenizer
 
 
-def update_tokenizer(tokenizer, add_imstart_token, map_eos, new_tokens):
-    print('map_eos', map_eos)
-    additional_special_tokens = []
-    if add_imstart_token:
-        additional_special_tokens.append('<|im_start|>')
-    
-    if new_tokens is not None:
-        additional_special_tokens.extend(new_tokens)
-    
-    if len(additional_special_tokens) > 0:
-        tokenizer.add_special_tokens({'additional_special_tokens': additional_special_tokens})
-    
-    if not map_eos:
-        print('Not mapping eos token, adding a new one.')
-        if tokenizer.get_vocab().get('<|im_end|>') is None:
-            tokenizer.add_special_tokens({'eos_token': '<|im_end|>'})
-        else:
-            print('Eos token already exists.')
+def update_tokenizer_and_model(model, tokenizer, add_imstart_token, map_eos, new_tokens):
+    vocab = tokenizer.get_vocab()
+    tokens_to_add = []
+    if add_imstart_token and '<|im_start|>' not in vocab:
+        tokens_to_add.append('<|im_start|>')
+    if new_tokens:
+        tokens_to_add.extend([token for token in new_tokens if token not in vocab])
 
-    # Make sure pad token is not the same as eos token
+    if tokens_to_add:
+        _add_tokens(model, tokenizer, tokens_to_add)
+
+    if not map_eos and '<|im_end|>' in tokenizer.get_vocab():
+        tokenizer.eos_token = '<|im_end|>'
+
     if tokenizer.pad_token_id == tokenizer.eos_token_id:
-        print('Pad token is the same as eos token.')
-        print('Updating pad token to unk token.')
         tokenizer.pad_token_id = tokenizer.unk_token_id
     elif tokenizer.pad_token_id is None:
-        print('Pad token is not set. Falling back to eos token for padding.')
         tokenizer.pad_token_id = tokenizer.eos_token_id
 
     if tokenizer.padding_side == 'left':
-        print('Padding side is left.')
-        print('Updating padding side to right.')
         tokenizer.padding_side = 'right'
 
     tokenizer = get_chat_template(
@@ -184,20 +67,12 @@ def update_tokenizer(tokenizer, add_imstart_token, map_eos, new_tokens):
         map_eos_token=map_eos
     )
 
-    print(f'Updated tokenizer. Vocab len: {len(tokenizer)}')
     return tokenizer
 
 
 def _update_model_eos_id(model, tokenizer):
     model.config.eos_token_id = tokenizer.get_vocab()['<|im_end|>']
     model.generation_config.eos_token_id = tokenizer.get_vocab()['<|im_end|>']
-
-
-def to_cuda_wrapper(method):
-    def fn(indices):
-        tensor = method(indices.cpu())
-        return tensor.cuda()
-    return fn
 
 
 def cpu_offload_embeddings(lora_model, config: BaseConfig):
@@ -223,4 +98,80 @@ def cpu_offload_embeddings(lora_model, config: BaseConfig):
     if config.modules_to_save == [] or config.modules_to_save is None:
         print('Nothing to offload.')
     
+
+def _add_tokens(model, tokenizer, tokens):
+    if not tokens:
+        return
+
+    if model is None:
+        tokenizer.add_tokens(tokens, special_tokens=False)
+        return
+
+    embed_rows = model.get_input_embeddings().weight.shape[0]
+    vocab_len = len(tokenizer)
+    # Qwen3 and similar models ship padded embedding matrices (rows > vocab),
+    # so prefer reusing those slots before triggering a resize.
+    padding_slots = max(embed_rows - vocab_len, 0)
+    tokens_without_resize = tokens[:padding_slots]
+    tokens_requiring_resize = tokens[padding_slots:]
+
+    if tokens_without_resize:
+        _use_padded_embeddings(model, tokenizer, tokens_without_resize)
+
+    if tokens_requiring_resize:
+        _call_add_new_tokens(model, tokenizer, tokens_requiring_resize)
+
+
+def _call_add_new_tokens(model, tokenizer, tokens):
+    if not tokens:
+        return
+
+    try:
+        add_new_tokens(model, tokenizer, new_tokens=tokens, special_tokens=False)
+    except TypeError:
+        add_new_tokens(model, tokenizer, new_tokens=tokens)
+
+
+def _use_padded_embeddings(model, tokenizer, tokens):
+    start_idx = len(tokenizer)
+    tokenizer.add_tokens(tokens, special_tokens=False)
+    end_idx = len(tokenizer)
+
+    mean_embedding, mean_lm_head = mean_of_trained_tokens(model)
+    mean_embedding = mean_embedding.to(torch.float32)
+    mean_lm_head = mean_lm_head.to(torch.float32)
+
+    input_embeddings = model.get_input_embeddings()
+    output_embeddings = model.get_output_embeddings()
+
+    with torch.no_grad():
+        input_embeddings.weight[start_idx:end_idx] = mean_embedding
+        if output_embeddings is not None:
+            output_embeddings.weight[start_idx:end_idx] = mean_lm_head
+
+    _mark_embeddings_trainable(model)
+    _update_vocab_size(model, len(tokenizer))
+
+    if model.config.tie_word_embeddings:
+        model.tie_weights()
+
+
+def _mark_embeddings_trainable(model):
+    internal_model = model
+    while hasattr(internal_model, "model"):
+        internal_model._need_to_train_embeddings = True
+        internal_model = internal_model.model
+    internal_model._need_to_train_embeddings = True
+
+
+def _update_vocab_size(model, new_size):
+    current_model = model
+    while hasattr(current_model, "model") and hasattr(current_model, "config"):
+        if hasattr(current_model.config, "vocab_size"):
+            current_vocab = getattr(current_model.config, "vocab_size", new_size)
+            current_model.config.update({"vocab_size": max(current_vocab, new_size)})
+        current_model = current_model.model
+    if hasattr(current_model, "config") and hasattr(current_model.config, "vocab_size"):
+        current_vocab = getattr(current_model.config, "vocab_size", new_size)
+        current_model.config.update({"vocab_size": max(current_vocab, new_size)})
     
