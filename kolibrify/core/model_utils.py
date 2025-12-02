@@ -137,17 +137,39 @@ def _use_padded_embeddings(model, tokenizer, tokens):
     tokenizer.add_tokens(tokens, special_tokens=False)
     end_idx = len(tokenizer)
 
+    input_embeddings = model.get_input_embeddings()
+    output_embeddings = model.get_output_embeddings()
+
     mean_embedding, mean_lm_head = mean_of_trained_tokens(model)
     mean_embedding = mean_embedding.to(torch.float32)
     mean_lm_head = mean_lm_head.to(torch.float32)
 
-    input_embeddings = model.get_input_embeddings()
-    output_embeddings = model.get_output_embeddings()
+    indicator_untrained = torch.amax(input_embeddings.weight, axis=1) <= 1e-16
+    trained_mask = ~indicator_untrained
+
+    std_embedding = input_embeddings.weight[trained_mask].to(torch.float32).std(
+        dim=0, unbiased=False
+    ).clamp_min(1e-6)
+    std_lm_head = (
+        output_embeddings.weight[trained_mask].to(torch.float32).std(
+            dim=0, unbiased=False
+        ).clamp_min(1e-6)
+        if output_embeddings is not None
+        else None
+    )
+
+    num_new = end_idx - start_idx
 
     with torch.no_grad():
-        input_embeddings.weight[start_idx:end_idx] = mean_embedding
+        input_embeddings.weight[start_idx:end_idx] = torch.normal(
+            mean_embedding.expand(num_new, -1),
+            std_embedding.expand(num_new, -1),
+        )
         if output_embeddings is not None:
-            output_embeddings.weight[start_idx:end_idx] = mean_lm_head
+            output_embeddings.weight[start_idx:end_idx] = torch.normal(
+                mean_lm_head.expand(num_new, -1),
+                std_lm_head.expand(num_new, -1),
+            )
 
     _mark_embeddings_trainable(model)
     _update_vocab_size(model, len(tokenizer))
