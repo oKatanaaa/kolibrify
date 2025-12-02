@@ -1,9 +1,10 @@
+import gc
+import os
+import torch
+from peft import PeftConfig
+from transformers import AutoTokenizer
 from unsloth import FastLanguageModel
 from unsloth.chat_templates import get_chat_template
-from transformers import AutoTokenizer
-from peft import PeftConfig
-import gc
-import torch
 
 from .config import BaseConfig
 
@@ -14,44 +15,74 @@ def free_mem():
 
 
 # Simplify the shit belows
+def _load_tokenizer(model_name_or_path, hf_token=None):
+    """
+    Prefer a local tokenizer next to the provided path (e.g., adapter dir),
+    otherwise fall back to loading from the model name / base path.
+    """
+    if os.path.isdir(model_name_or_path):
+        # If the path is a directory, try to load tokenizer from it directly.
+        try:
+            return AutoTokenizer.from_pretrained(model_name_or_path, token=hf_token)
+        except Exception:
+            pass
+    return AutoTokenizer.from_pretrained(model_name_or_path, token=hf_token)
+
+
 def get_source_vocab_size(model_name, loading_lora, hf_token):
     if loading_lora:
-        peft_config = PeftConfig.from_pretrained(model_name, token = hf_token)
-        _model_name = peft_config.base_model_name_or_path
-        _tokenizer = AutoTokenizer.from_pretrained(_model_name, token = hf_token)
-        return len(_tokenizer.get_vocab())
+        # When loading a LoRA adapter, prefer tokenizer inside the adapter path if present.
+        try:
+            tok = _load_tokenizer(model_name, hf_token)
+            return len(tok.get_vocab())
+        except Exception:
+            peft_config = PeftConfig.from_pretrained(model_name, token=hf_token)
+            _model_name = peft_config.base_model_name_or_path
+            tok = _load_tokenizer(_model_name, hf_token)
+            return len(tok.get_vocab())
 
-    _tokenizer = AutoTokenizer.from_pretrained(model_name, token = hf_token)
-    return len(_tokenizer.get_vocab())
+    tok = _load_tokenizer(model_name, hf_token)
+    return len(tok.get_vocab())
 
 
 def vocab_has_imend(model_name, loading_lora, hf_token):
     if loading_lora:
-        peft_config = PeftConfig.from_pretrained(model_name, token = hf_token)
-        _model_name = peft_config.base_model_name_or_path
-        _tokenizer = AutoTokenizer.from_pretrained(_model_name, token = hf_token)
-        return '<|im_end|>' in _tokenizer.get_vocab()
+        try:
+            tok = _load_tokenizer(model_name, hf_token)
+        except Exception:
+            peft_config = PeftConfig.from_pretrained(model_name, token=hf_token)
+            _model_name = peft_config.base_model_name_or_path
+            tok = _load_tokenizer(_model_name, hf_token)
+        return '<|im_end|>' in tok.get_vocab()
 
-    _tokenizer = AutoTokenizer.from_pretrained(model_name, token = hf_token)
-    return '<|im_end|>' in _tokenizer.get_vocab()
+    tok = _load_tokenizer(model_name, hf_token)
+    return '<|im_end|>' in tok.get_vocab()
 
 
-def determine_new_vocab_size(model_name: str, hf_token: str, loading_lora: bool, add_imstart_token: bool, map_eos: bool, new_tokens: list):
-    basic_modifier = int(add_imstart_token)
+def determine_new_vocab_size(model_name: str, hf_token: str, loading_lora: bool,
+                             add_imstart_token: bool, map_eos: bool, new_tokens: list):
+    # Count only tokens that are missing to avoid shrinking/expanding incorrectly.
+    tok = _load_tokenizer(model_name, hf_token)
+    existing_vocab = tok.get_vocab()
+
+    missing = 0
+    if add_imstart_token and '<|im_start|>' not in existing_vocab:
+        missing += 1
+
     if new_tokens is not None:
-        basic_modifier += len(new_tokens)
+        for t in new_tokens:
+            if t not in existing_vocab:
+                missing += 1
 
-    if not vocab_has_imend(model_name, loading_lora, hf_token) and not map_eos:
-        basic_modifier += 1
+    if not map_eos and '<|im_end|>' not in existing_vocab:
+        missing += 1
 
-    source_vocab_size = get_source_vocab_size(model_name, loading_lora, hf_token)
+    source_vocab_size = len(existing_vocab)
     print(f'Source vocab size: {source_vocab_size}')
-    resize_model_vocab = None
-    
-    if basic_modifier > 0:
-        resize_model_vocab = source_vocab_size + basic_modifier
-    
-    return resize_model_vocab
+
+    if missing == 0:
+        return None
+    return source_vocab_size + missing
 
 
 def get_model(

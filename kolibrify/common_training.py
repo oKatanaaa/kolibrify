@@ -107,7 +107,7 @@ def apply_lora_adapter(model, config, gradient_checkpointing: str | bool = "unsl
         use_rslora=config.use_rslora
     )
 
-def run_training(trainer, config):
+def run_training(trainer, config, tokenizer=None):
     """Run the training process with the configured trainer."""
     if config.checkpoint is not None:
         print(f'Starting from checkpoint: {config.checkpoint}')
@@ -119,4 +119,6 @@ def run_training(trainer, config):
     print("Saving model...")
     # --- Save
     trainer.model.save_pretrained(config.output_dir)
+    if tokenizer is not None:
+        tokenizer.save_pretrained(config.output_dir)
     print("Model saved successfully.")
