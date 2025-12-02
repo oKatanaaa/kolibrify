@@ -61,10 +61,19 @@ def vocab_has_imend(model_name, loading_lora, hf_token):
 
 def determine_new_vocab_size(model_name: str, hf_token: str, loading_lora: bool,
                              add_imstart_token: bool, map_eos: bool, new_tokens: list):
-    # Count only tokens that are missing to avoid shrinking/expanding incorrectly.
+    # Always anchor on the tokenizer that lives next to the provided path (adapter or base).
     tok = _load_tokenizer(model_name, hf_token)
     existing_vocab = tok.get_vocab()
 
+    # When loading a LoRA adapter, ensure the base model is resized exactly to this tokenizer size
+    # (to avoid size mismatches when merging). Do not attempt incremental adds; the adapter already
+    # knows its vocabulary.
+    if loading_lora:
+        source_vocab_size = len(existing_vocab)
+        print(f'Source vocab size: {source_vocab_size}')
+        return source_vocab_size
+
+    # For base loads, only add truly missing tokens.
     missing = 0
     if add_imstart_token and '<|im_start|>' not in existing_vocab:
         missing += 1
