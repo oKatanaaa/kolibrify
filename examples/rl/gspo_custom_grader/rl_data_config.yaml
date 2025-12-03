@@ -1,0 +1,27 @@
+paths:
+  data_root: "data"
+
+datasets:
+  gsm8k:
+    path: "gsm8k_train.jsonl"
+    graders:
+      - math_exact
+      - number_only
+      - russian_reasoning
+    grader_weights:
+      - 2.0
+      - 0.5
+      - 1.0
+
+stages:
+  - name: main
+    until_step: 100
+    datasets:
+      - id: gsm8k
+        weight: 1.0
+
+external_graders: {}
+
+python_graders:
+  russian_reasoning:
+    path: "./custom_graders.py:RussianReasoningGrader"
