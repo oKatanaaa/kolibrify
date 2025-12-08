@@ -278,7 +278,10 @@ def create_app(config_path: str, verbose: bool = False) -> FastAPI:
     async def grade(req: GradeRequest) -> GradeResponse:
         results = await server.grade(req.items)
         if server.verbose:
-            paired = list(zip(results, req.items))
+            # Map results back to their original completions; dataset grouping may reorder.
+            item_lookup = {
+                (item.sample_id, item.completion_index): item for item in req.items
+            }
 
             def _sid(res: GradeResultOut) -> str:
                 return (
@@ -286,7 +289,7 @@ def create_app(config_path: str, verbose: bool = False) -> FastAPI:
                     f"{'' if res.completion_index is None else f'#{res.completion_index}'}"
                 )
 
-            rewards = [res.reward for res, _ in paired]
+            rewards = [res.reward for res in results]
             if rewards:
                 summary = (
                     f"[dataserver] iteration={req.iteration} graded {len(results)} | "
@@ -298,14 +301,18 @@ def create_app(config_path: str, verbose: bool = False) -> FastAPI:
                 summary = f"[dataserver] iteration={req.iteration} graded 0 completions."
             print(summary)
 
-            if paired:
+            if results:
                 print("  rewards:")
-                for res, _item in paired:
+                for res in results:
                     print(f"    {_sid(res):<32} {res.reward:>6.3f}")
 
-            if paired:
-                best_res, best_item = max(paired, key=lambda x: x[0].reward)
-                worst_res, worst_item = min(paired, key=lambda x: x[0].reward)
+            if results:
+                best_res = max(results, key=lambda r: r.reward)
+                worst_res = min(results, key=lambda r: r.reward)
+
+                def _completion_for(res: GradeResultOut) -> str | None:
+                    item = item_lookup.get((res.sample_id, res.completion_index))
+                    return item.completion if item else None
 
                 def _block(title: str, res: GradeResultOut, completion: str | None) -> None:
                     print(f"\n-------- {title} --------")
@@ -317,8 +324,8 @@ def create_app(config_path: str, verbose: bool = False) -> FastAPI:
                         # Extra newline to visually separate multi-line completions.
                         print(f"{completion.strip()}")
 
-                _block("BEST", best_res, best_item.completion)
-                _block("WORST", worst_res, worst_item.completion)
+                _block("BEST", best_res, _completion_for(best_res))
+                _block("WORST", worst_res, _completion_for(worst_res))
         return GradeResponse(
             results=[
                 GradeResultOut(
