@@ -184,8 +184,8 @@ class JsonSchemaGrader(Grader):
                 )
                 continue
 
-            completion = item.completion
-            parsed, penalty = self._parse_with_penalty(completion)
+            text = item.answer if isinstance(item.answer, str) and item.answer.strip() else item.completion
+            parsed, penalty = self._parse_with_penalty(text)
             if parsed is None:
                 reward = 0.0
             else:
