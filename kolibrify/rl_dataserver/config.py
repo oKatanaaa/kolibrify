@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import pathlib
-from typing import Dict, List
+from typing import Dict, List, Optional
 import yaml
 
 
@@ -26,6 +26,13 @@ class DatasetConfig:
 
 
 @dataclasses.dataclass
+class PythonGraderConfig:
+    module: Optional[str]
+    target: str
+    path: Optional[pathlib.Path] = None
+
+
+@dataclasses.dataclass
 class StageDatasetConfig:
     id: str
     weight: float
@@ -42,6 +49,7 @@ class StageConfig:
 class RLDataConfig:
     paths: PathsConfig
     external_graders: Dict[str, ExternalGraderConfig]
+    python_graders: Dict[str, PythonGraderConfig]
     datasets: Dict[str, DatasetConfig]
     stages: List[StageConfig]
 
@@ -95,6 +103,53 @@ def load_config(path: str) -> RLDataConfig:
             type=cfg["type"], url=cfg["url"], timeout_s=float(cfg.get("timeout_s", 60))
         )
 
+    python_graders: Dict[str, PythonGraderConfig] = {}
+    for name, cfg in (raw.get("python_graders") or {}).items():
+        if not isinstance(cfg, dict):
+            raise ConfigError(f"python_graders.{name} must be a mapping")
+        import_spec = cfg.get("import")
+        path_spec = cfg.get("path")
+        if bool(import_spec) == bool(path_spec):
+            raise ConfigError(
+                f"python_graders.{name} must define exactly one of 'import' or 'path'"
+            )
+
+        if import_spec is not None:
+            if not isinstance(import_spec, str):
+                raise ConfigError(f"python_graders.{name}.import must be a string")
+            if ":" not in import_spec:
+                raise ConfigError(
+                    f"python_graders.{name}.import must be in the form 'module:Attr'"
+                )
+            module_name, target = import_spec.rsplit(":", 1)
+            if not module_name or not target:
+                raise ConfigError(
+                    f"python_graders.{name}.import must include both module and attribute"
+                )
+            python_graders[name] = PythonGraderConfig(module=module_name, target=target)
+        else:
+            if not isinstance(path_spec, str):
+                raise ConfigError(f"python_graders.{name}.path must be a string")
+            if ":" not in path_spec:
+                raise ConfigError(
+                    f"python_graders.{name}.path must be in the form 'path/to/file.py:Attr'"
+                )
+            path_str, target = path_spec.rsplit(":", 1)
+            if not path_str or not target:
+                raise ConfigError(
+                    f"python_graders.{name}.path must include both file path and attribute"
+                )
+            grader_path = pathlib.Path(path_str)
+            if not grader_path.is_absolute():
+                grader_path = (config_dir / grader_path).resolve()
+            if not grader_path.exists():
+                raise ConfigError(f"python_graders.{name}.path does not exist: {grader_path}")
+            python_graders[name] = PythonGraderConfig(
+                module=None,
+                target=target,
+                path=grader_path,
+            )
+
     datasets: Dict[str, DatasetConfig] = {}
     for dataset_id, cfg in (raw.get("datasets") or {}).items():
         dataset_path = pathlib.Path(cfg["path"])
@@ -135,6 +190,7 @@ def load_config(path: str) -> RLDataConfig:
     return RLDataConfig(
         paths=paths,
         external_graders=external_graders,
+        python_graders=python_graders,
         datasets=datasets,
         stages=stages,
     )
@@ -144,6 +200,7 @@ __all__ = [
     "ConfigError",
     "DatasetConfig",
     "ExternalGraderConfig",
+    "PythonGraderConfig",
     "PathsConfig",
     "RLDataConfig",
     "StageConfig",

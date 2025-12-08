@@ -1,22 +1,29 @@
 from __future__ import annotations
 
+import importlib
+import importlib.util
+import inspect
 import random
+from types import ModuleType
 from typing import Dict, List, Mapping
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from .config import RLDataConfig, StageConfig, load_config
+from .config import ConfigError, PythonGraderConfig, RLDataConfig, StageConfig, load_config
 from .datasets import load_datasets
 from .graders import (
     DatasetReward,
     ExternalHttpGrader,
     GradeResult,
+    Grader,
     GraderInput,
     JsonValidGrader,
+    JsonSchemaGrader,
     MathExactGrader,
     NumberOnlyGrader,
     ReasoningFormatGrader,
+    XmlSchemaGrader,
 )
 
 
@@ -81,12 +88,53 @@ class RLDataServer:
     def _build_graders(self) -> Dict[str, object]:
         graders: Dict[str, object] = {
             "json_valid": JsonValidGrader(),
+            "json_schema": JsonSchemaGrader(),
             "math_exact": MathExactGrader(),
             "number_only": NumberOnlyGrader(),
+            "xml_schema": XmlSchemaGrader(),
         }
         for name, cfg in self.config.external_graders.items():
             graders[name] = ExternalHttpGrader(name, cfg)
+        for name, cfg in self.config.python_graders.items():
+            graders[name] = self._load_python_grader(name, cfg)
         return graders
+
+    def _load_python_grader(self, name: str, cfg: PythonGraderConfig) -> Grader:
+        target_attr = cfg.target
+
+        if cfg.path is not None:
+            module_name = f"_kolibrify_user_grader_{name}"
+            spec = importlib.util.spec_from_file_location(module_name, cfg.path)
+            if spec is None or spec.loader is None:
+                raise ConfigError(f"Failed to load grader '{name}' from {cfg.path}")
+            module = importlib.util.module_from_spec(spec)
+            loader = spec.loader
+            assert loader is not None
+            loader.exec_module(module)
+        elif cfg.module is not None:
+            module = importlib.import_module(cfg.module)
+        else:
+            raise ConfigError(f"Invalid python grader config for '{name}'")
+
+        grader_obj = self._resolve_target(module, target_attr, name)
+        if inspect.isclass(grader_obj):
+            grader_instance = grader_obj()
+        else:
+            grader_instance = grader_obj
+
+        if not isinstance(grader_instance, Grader):
+            raise ConfigError(
+                f"python_grader '{name}' must be a Grader instance or subclass"
+            )
+        return grader_instance
+
+    @staticmethod
+    def _resolve_target(module: ModuleType, attr: str, name: str):
+        if not hasattr(module, attr):
+            raise ConfigError(
+                f"Attribute '{attr}' not found in python_grader '{name}' module {module.__name__}"
+            )
+        return getattr(module, attr)
 
     def _build_dataset_rewards(self) -> Dict[str, DatasetReward]:
         rewards: Dict[str, DatasetReward] = {}

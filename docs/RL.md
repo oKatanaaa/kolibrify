@@ -22,9 +22,13 @@ Kolibrify’s RL pipeline is intentionally split into two cooperating pieces: a 
 - `datasets`: map of dataset id -> `{path, graders, grader_weights}`. Paths are relative to `data_root`. Graders listed here are **added on top of** the built-in format grader.
 - `stages`: ordered list defining curriculum. Each stage has `until_step` and a weighted mix of dataset ids; sampling switches stages as iterations pass the boundaries.
 - `external_graders`: optional remote HTTP graders (see `ExternalHttpGrader`).
+- `python_graders`: optional local Python graders loaded from modules or file paths (`module:Attr` or `path/to/grader.py:Attr`).
 
 ## Graders
-- Built-in: `reasoning_format` (auto), `math_exact`, `json_valid`.
+- Built-in: `reasoning_format` (auto), `math_exact`, `json_valid`, `json_schema`, `xml_schema`.
+- `json_schema`: expects `record["metadata"]["schema"]` to be a JSON-serialized object schema with `required` keys and optional `allow_additional_properties`. Valid JSON gets at least 0.5; correct schema is 1.0; extra keys 0.9; missing required 0.8; both 0.7. If JSON only parses after stripping markdown fences or via `ast.literal_eval`, the final score is multiplied by 0.9.
+- `xml_schema`: expects `record["metadata"]["schema"]` to be a JSON string containing `{"root_tag": "answer"}`. Well-formed XML earns 0.5, wrong root tag 0.8, correct root 1.0; parsing via fenced-block stripping applies a 0.9 multiplier.
+- Python/local: point to importable classes or module paths via `python_graders` in the dataserver config; the referenced attribute must implement `grade_batch` and typically subclasses `Grader`.
 - External: register remote HTTP graders in the dataserver config; payload includes prompt/system_prompt/answer/metadata plus the parsed `reasoning` and `final_response`.
 - Grader weights are normalized (including the built-in one).
 

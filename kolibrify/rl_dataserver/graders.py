@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import ast
 import asyncio
 import json
 import re
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from typing import Dict, List, Mapping, Sequence
 
@@ -130,6 +132,221 @@ class JsonValidGrader(Grader):
                 )
             )
         return results
+
+
+class JsonSchemaGrader(Grader):
+    """
+    Grades completions against a minimal JSON schema stored in record['metadata']['schema'].
+
+    Expected logical schema (before serialization):
+        {
+            "type": "object",
+            "required": ["answer", ...],
+            "allow_additional_properties": false | true
+        }
+
+    Checks that the completion parses as a JSON object, contains all required keys,
+    and optionally forbids extra keys. Does not validate value types or numeric correctness.
+    Partial credit is given for parseable JSON (0.5) and for missing/extra keys (0.7-0.9).
+    If the completion is inside a markdown fence or only parses via ast.literal_eval,
+    grading still happens with a 0.9 penalty multiplier.
+    """
+
+    def __init__(self, reward_if_no_schema: float = 0.0) -> None:
+        self.reward_if_no_schema = reward_if_no_schema
+
+    async def grade_batch(self, inputs: Sequence[GraderInput]) -> List[GradeResult]:
+        results: List[GradeResult] = []
+
+        for item in inputs:
+            record: Mapping[str, object] = item.record
+            metadata = record.get("metadata") if isinstance(record, Mapping) else None
+
+            schema_dict = None
+            if isinstance(metadata, Mapping):
+                schema_json = metadata.get("schema")
+                if isinstance(schema_json, str):
+                    try:
+                        parsed_schema = json.loads(schema_json)
+                    except json.JSONDecodeError:
+                        parsed_schema = None
+                    if isinstance(parsed_schema, Mapping):
+                        schema_dict = parsed_schema
+
+            if schema_dict is None:
+                reward = self.reward_if_no_schema
+                results.append(
+                    GradeResult(
+                        sample_id=item.sample_id,
+                        reward=reward,
+                        completion_index=item.completion_index,
+                    )
+                )
+                continue
+
+            completion = item.completion
+            parsed, penalty = self._parse_with_penalty(completion)
+            if parsed is None:
+                reward = 0.0
+            else:
+                reward = self._validate_json(parsed, schema_dict) * penalty
+
+            results.append(
+                GradeResult(
+                    sample_id=item.sample_id,
+                    reward=reward,
+                    completion_index=item.completion_index,
+                )
+            )
+
+        return results
+
+    @staticmethod
+    def _extract_code_block(text: str) -> str | None:
+        """Pull content out of a fenced code block like ```json ... ```."""
+        fenced = re.search(r"```[\w-]*\n(.*?)```", text, flags=re.DOTALL)
+        if fenced:
+            return fenced.group(1).strip()
+        return None
+
+    @classmethod
+    def _parse_with_penalty(cls, text: str) -> tuple[object | None, float]:
+        # Try standard JSON first.
+        try:
+            return json.loads(text), 1.0
+        except json.JSONDecodeError:
+            pass
+
+        # Relaxed: strip fenced block or fall back to literal_eval.
+        candidate = cls._extract_code_block(text) or text
+        for parser in (json.loads, ast.literal_eval):
+            try:
+                return parser(candidate), 0.9
+            except Exception:
+                continue
+        return None, 0.0
+
+    @staticmethod
+    def _validate_json(obj: object, schema: Mapping[str, object]) -> float:
+        # Valid JSON earns at least 0.5; schema conformance refines it.
+        if not isinstance(obj, dict):
+            return 0.5
+
+        required = schema.get("required") or []
+        allow_additional = bool(schema.get("allow_additional_properties", True))
+
+        if not isinstance(required, list):
+            return 0.5
+
+        required_set = set(required)
+        keys = set(obj.keys())
+
+        missing = not required_set.issubset(keys)
+        extra = not allow_additional and keys - required_set
+
+        if missing and extra:
+            return 0.7
+        if missing:
+            return 0.8
+        if extra:
+            return 0.9
+        return 1.0
+
+
+class XmlSchemaGrader(Grader):
+    """
+    Grades completions against a minimal XML schema stored in record['metadata']['schema'].
+
+    Expected logical schema (before serialization):
+        {
+            "root_tag": "answer"
+        }
+
+    Matches only on the root tag name. Attributes, children, and content are unchecked.
+    Well-formed XML earns 0.5, wrong root tag 0.8, correct root 1.0. If parsing only
+    succeeds after stripping a fenced block, the final reward is multiplied by 0.9.
+    """
+
+    def __init__(self, reward_if_no_schema: float = 0.0) -> None:
+        self.reward_if_no_schema = reward_if_no_schema
+
+    async def grade_batch(self, inputs: Sequence[GraderInput]) -> List[GradeResult]:
+        results: List[GradeResult] = []
+
+        for item in inputs:
+            record: Mapping[str, object] = item.record
+            metadata = record.get("metadata") if isinstance(record, Mapping) else None
+
+            schema_dict = None
+            if isinstance(metadata, Mapping):
+                schema_json = metadata.get("schema")
+                if isinstance(schema_json, str):
+                    try:
+                        parsed_schema = json.loads(schema_json)
+                    except json.JSONDecodeError:
+                        parsed_schema = None
+                    if isinstance(parsed_schema, Mapping):
+                        schema_dict = parsed_schema
+
+            if schema_dict is None:
+                reward = self.reward_if_no_schema
+                results.append(
+                    GradeResult(
+                        sample_id=item.sample_id,
+                        reward=reward,
+                        completion_index=item.completion_index,
+                    )
+                )
+                continue
+
+            completion = item.completion
+            root, penalty = self._parse_with_penalty(completion)
+            if root is None:
+                reward = 0.0
+            else:
+                reward = self._validate_xml(root, schema_dict) * penalty
+
+            results.append(
+                GradeResult(
+                    sample_id=item.sample_id,
+                    reward=reward,
+                    completion_index=item.completion_index,
+                )
+            )
+
+        return results
+
+    @staticmethod
+    def _extract_code_block(text: str) -> str | None:
+        fenced = re.search(r"```[\w-]*\n(.*?)```", text, flags=re.DOTALL)
+        if fenced:
+            return fenced.group(1).strip()
+        return None
+
+    @classmethod
+    def _parse_with_penalty(cls, text: str) -> tuple[ET.Element | None, float]:
+        try:
+            return ET.fromstring(text.strip()), 1.0
+        except ET.ParseError:
+            pass
+
+        candidate = cls._extract_code_block(text) or text
+        try:
+            return ET.fromstring(candidate.strip()), 0.9
+        except ET.ParseError:
+            return None, 0.0
+
+    @staticmethod
+    def _validate_xml(root: ET.Element, schema: Mapping[str, object]) -> float:
+        # Well-formed XML is at least 0.5; matching the root tag gives full credit.
+        expected_tag = schema.get("root_tag")
+        if not isinstance(expected_tag, str):
+            return 0.5
+
+        if root.tag != expected_tag:
+            return 0.8
+
+        return 1.0
 
 
 _number_re = re.compile(r"[-+]?\d*\.\d+|[-+]?\d+")
@@ -327,8 +544,10 @@ __all__ = [
     "GraderInput",
     "ReasoningFormatGrader",
     "JsonValidGrader",
+    "JsonSchemaGrader",
     "MathExactGrader",
     "NumberOnlyGrader",
+    "XmlSchemaGrader",
     "ExternalHttpGrader",
     "DatasetReward",
     "build_graders",
