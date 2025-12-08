@@ -111,3 +111,16 @@ class TestXmlSchemaGrader(unittest.TestCase):
     def test_missing_tag_in_schema(self):
         reward = self._grade("<answer/>", {"root_tag": None})
         self.assertEqual(reward, 0.5)
+
+    def test_uses_parsed_answer_over_completion(self):
+        # Completion has two roots; answer is valid XML and should be used.
+        completion = "<think>reasoning</think>\n<answer>ok</answer>"
+        inp = GraderInput(
+            sample_id="s1",
+            record={"metadata": _schema_metadata(self.schema)},
+            completion=completion,
+            reasoning="reasoning",
+            answer="<answer>ok</answer>",
+        )
+        reward = asyncio.run(self.grader.grade_batch([inp]))[0].reward
+        self.assertEqual(reward, 1.0)

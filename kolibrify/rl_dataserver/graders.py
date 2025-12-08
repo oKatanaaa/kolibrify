@@ -299,8 +299,9 @@ class XmlSchemaGrader(Grader):
                 )
                 continue
 
-            completion = item.completion
-            root, penalty = self._parse_with_penalty(completion)
+            # Prefer the parsed final answer when available; fall back to the full completion.
+            text = item.answer if isinstance(item.answer, str) and item.answer.strip() else item.completion
+            root, penalty = self._parse_with_penalty(text)
             if root is None:
                 reward = 0.0
             else:
