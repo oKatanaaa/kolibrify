@@ -1,0 +1,63 @@
+paths:
+  data_root: "data"
+
+datasets:
+  task_types:
+    path: "fake_task_types.jsonl"  # placeholder; supply your own dataset file
+    graders:
+      - task_type_match
+    grader_weights:
+      - 1.0
+
+  response_formats:
+    path: "fake_response_formats.jsonl"  # placeholder; supply your own dataset file
+    graders:
+      - response_format_match
+    grader_weights:
+      - 1.0
+
+stages:
+  - name: main
+    until_step: 100
+    datasets:
+      - id: task_types
+        weight: 0.5
+      - id: response_formats
+        weight: 0.5
+
+external_graders: {}
+
+python_graders:
+  task_type_match:
+    builtin: category_match
+    init_kwargs:
+      allowed_categories:
+        - Truthfulness questions
+        - Attribute driven text generation
+        - Summarization
+        - Linguistic Acceptability
+        - Logical inference
+        - Paraphrase identification
+        - Contextual QA
+        - Sentiment analysis
+        - Semantic equivalence analysis
+        - Algorithmic
+        - Contextual question generation
+        - Answer explanation
+        - Categorization
+        - Title generation
+        - Math
+        - Other
+
+  response_format_match:
+    builtin: category_match
+    init_kwargs:
+      allowed_categories:
+        - Choice from provided options
+        - Free-form response
+        - Structured response
+        - Numeric
+        - Hybrid
+        - Extractive answers
+        - Code/program/logical form generation
+        - Multiple formats

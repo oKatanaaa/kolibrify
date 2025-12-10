@@ -1,0 +1,61 @@
+model:
+  base_model: "unsloth/Qwen2.5-3B-Instruct"
+  continued_training: false
+  access_token: null
+  load_in_4bit: true
+  lora_r: 16
+  lora_alpha: 16
+  lora_dropout: 0
+  lora_target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
+  modules_to_save:
+    - embed_tokens
+    - lm_head
+  use_rslora: false
+  gradient_checkpointing: "unsloth"
+  max_seq_length: 512
+  add_imstart_token: false
+  map_eos_to_imend: false
+  custom_tokens: null
+  cpu_offload_embeddings: false
+  merge: false
+
+training:
+  max_steps: 50
+  per_device_train_batch_size: 1
+  gradient_accumulation_steps: 1
+  num_generations: 4
+  temperature: 1.0
+  learning_rate: 5.0e-06
+  weight_decay: 0.0
+  warmup_ratio: 0.1
+  lr_scheduler_type: cosine
+  optim: adamw_8bit
+  logging_steps: 1
+  save_steps: 250
+  report_to: none
+  max_prompt_length: 256
+  max_completion_length: 256
+
+rl:
+  rl_algorithm: gspo
+  num_iterations: 1
+  epsilon: 0.2
+  scale_rewards: group
+  loss_type: grpo
+
+data:
+  server_url: "http://127.0.0.1:9000"
+  request_timeout_seconds: 60
+  meta_timeout_seconds: 30
+  max_retries: 5
+  retry_backoff_seconds: 2.0
+
+paths:
+  output_dir: "rl-configurable-category-match"

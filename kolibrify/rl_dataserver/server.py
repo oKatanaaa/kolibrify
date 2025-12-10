@@ -118,8 +118,15 @@ class RLDataServer:
 
         grader_obj = self._resolve_target(module, target_attr, name)
         if inspect.isclass(grader_obj):
-            grader_instance = grader_obj()
+            try:
+                grader_instance = grader_obj(**cfg.init_kwargs)
+            except TypeError as exc:
+                raise ConfigError(f"Failed to initialize grader '{name}': {exc}") from exc
         else:
+            if cfg.init_kwargs:
+                raise ConfigError(
+                    f"python_grader '{name}' provides init_kwargs but target is not a class"
+                )
             grader_instance = grader_obj
 
         if not isinstance(grader_instance, Grader):

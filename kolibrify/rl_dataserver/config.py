@@ -4,6 +4,7 @@ import dataclasses
 import pathlib
 from typing import Dict, List, Optional
 import yaml
+from .builtin_graders import BUILTIN_PYTHON_GRADERS
 
 
 @dataclasses.dataclass
@@ -30,6 +31,8 @@ class PythonGraderConfig:
     module: Optional[str]
     target: str
     path: Optional[pathlib.Path] = None
+    builtin: Optional[str] = None
+    init_kwargs: Dict[str, object] = dataclasses.field(default_factory=dict)
 
 
 @dataclasses.dataclass
@@ -107,11 +110,18 @@ def load_config(path: str) -> RLDataConfig:
     for name, cfg in (raw.get("python_graders") or {}).items():
         if not isinstance(cfg, dict):
             raise ConfigError(f"python_graders.{name} must be a mapping")
+
+        init_kwargs = cfg.get("init_kwargs") or {}
+        if not isinstance(init_kwargs, dict):
+            raise ConfigError(f"python_graders.{name}.init_kwargs must be a mapping if provided")
+
         import_spec = cfg.get("import")
         path_spec = cfg.get("path")
-        if bool(import_spec) == bool(path_spec):
+        builtin_spec = cfg.get("builtin")
+        specs = [bool(import_spec), bool(path_spec), bool(builtin_spec)]
+        if sum(specs) != 1:
             raise ConfigError(
-                f"python_graders.{name} must define exactly one of 'import' or 'path'"
+                f"python_graders.{name} must define exactly one of 'import', 'path', or 'builtin'"
             )
 
         if import_spec is not None:
@@ -126,8 +136,10 @@ def load_config(path: str) -> RLDataConfig:
                 raise ConfigError(
                     f"python_graders.{name}.import must include both module and attribute"
                 )
-            python_graders[name] = PythonGraderConfig(module=module_name, target=target)
-        else:
+            python_graders[name] = PythonGraderConfig(
+                module=module_name, target=target, init_kwargs=init_kwargs
+            )
+        elif path_spec is not None:
             if not isinstance(path_spec, str):
                 raise ConfigError(f"python_graders.{name}.path must be a string")
             if ":" not in path_spec:
@@ -148,6 +160,21 @@ def load_config(path: str) -> RLDataConfig:
                 module=None,
                 target=target,
                 path=grader_path,
+                init_kwargs=init_kwargs,
+            )
+        else:
+            if not isinstance(builtin_spec, str):
+                raise ConfigError(f"python_graders.{name}.builtin must be a string")
+            if builtin_spec not in BUILTIN_PYTHON_GRADERS:
+                raise ConfigError(
+                    f"python_graders.{name}.builtin references unknown grader '{builtin_spec}'"
+                )
+            module_name, target = BUILTIN_PYTHON_GRADERS[builtin_spec]
+            python_graders[name] = PythonGraderConfig(
+                module=module_name,
+                target=target,
+                builtin=builtin_spec,
+                init_kwargs=init_kwargs,
             )
 
     datasets: Dict[str, DatasetConfig] = {}

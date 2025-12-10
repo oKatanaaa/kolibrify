@@ -37,6 +37,67 @@ class Grader:
         raise NotImplementedError
 
 
+class CategoryMatchGrader(Grader):
+    """
+    Grades classification completions by checking if the predicted category
+    matches the expected category from a predefined list.
+
+    Reward levels:
+    - 1.0: Exact match (case sensitive)
+    - 0.8: Case insensitive match
+    - 0.5: Category string present in answer (case insensitive) but with extra text
+    - 0.3: Wrong category, but it's from the allowed categories list
+    - 0.0: Otherwise
+    """
+
+    def __init__(self, allowed_categories: Sequence[str]) -> None:
+        self.allowed_categories = list(allowed_categories)
+        self.allowed_categories_lower = {cat.lower() for cat in self.allowed_categories}
+
+    async def grade_batch(self, inputs: Sequence[GraderInput]) -> List[GradeResult]:
+        results: List[GradeResult] = []
+
+        for item in inputs:
+            response = item.answer if item.answer and item.answer.strip() else item.completion
+            response = response.strip() if response else ""
+
+            expected_category = None
+            if isinstance(item.record, Mapping):
+                expected_category = item.record.get("answer") or item.record.get("expected_category")
+
+            reward = 0.0
+            if expected_category and response:
+                reward = self._calculate_reward(response, str(expected_category))
+
+            results.append(
+                GradeResult(
+                    sample_id=item.sample_id,
+                    reward=reward,
+                    completion_index=item.completion_index,
+                )
+            )
+
+        return results
+
+    def _calculate_reward(self, response: str, expected_category: str) -> float:
+        if response == expected_category:
+            return 1.0
+
+        response_lower = response.lower()
+        expected_lower = expected_category.lower()
+
+        if response_lower == expected_lower:
+            return 0.8
+
+        if expected_lower in response_lower:
+            return 0.5
+
+        if response_lower in self.allowed_categories_lower:
+            return 0.3
+
+        return 0.0
+
+
 class ReasoningFormatGrader(Grader):
     """Reward adherence to the Qwen-style reasoning format.
 
@@ -543,6 +604,7 @@ __all__ = [
     "GradeResult",
     "Grader",
     "GraderInput",
+    "CategoryMatchGrader",
     "ReasoningFormatGrader",
     "JsonValidGrader",
     "JsonSchemaGrader",
