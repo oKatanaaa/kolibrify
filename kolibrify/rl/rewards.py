@@ -25,9 +25,18 @@ def build_remote_reward_fn(
     request_timeout_seconds: float = 60.0,
     max_retries: int = 3,
     retry_backoff_seconds: float = 1.0,
+    tokenizer=None,
 ):
     session = requests.Session()
     iteration_counter = {"value": 0}
+
+    def _count_tokens(text: str):
+        if tokenizer is None:
+            return None
+        try:
+            return len(tokenizer.encode(text, add_special_tokens=False))
+        except Exception:
+            return None
 
     def _with_retries(fn, op_name: str):
         nonlocal session
@@ -58,7 +67,7 @@ def build_remote_reward_fn(
         # TRL/GRPO can pass multiple generations per prompt. Flatten any nested
         # completions and repeat sample_ids so every generated completion is
         # graded individually.
-        completions_flat = []
+        completions_flat: list[str] = []
         completion_sample_ids = []
 
         # Determine how many generations we expect so we can repeat sample_ids.
@@ -73,13 +82,13 @@ def build_remote_reward_fn(
                 sid = sample_ids[idx] if idx < len(sample_ids) else None
                 if isinstance(completion, list):
                     for gen_completion in completion:
-                        completions_flat.append(gen_completion)
+                        completions_flat.append(_completion_to_text(gen_completion))
                         completion_sample_ids.append(sid)
                 else:
-                    completions_flat.append(completion)
+                    completions_flat.append(_completion_to_text(completion))
                     completion_sample_ids.append(sid)
         else:
-            completions_flat = list(completions)
+            completions_flat = [_completion_to_text(c) for c in completions]
             if sample_ids and len(sample_ids) > 0:
                 # Repeat each sample_id for its generations so grade() can map rewards.
                 repeat = len(completions_flat) // len(sample_ids) or 1
@@ -90,12 +99,38 @@ def build_remote_reward_fn(
             else:
                 completion_sample_ids = [None for _ in completions_flat]
 
+        completion_token_counts = []
+        provided_counts = kwargs.get("completion_token_counts")
+
+        provided_counts_flat = []
+        if provided_counts is not None:
+            if any(isinstance(c, list) for c in provided_counts):
+                for c in provided_counts:
+                    if isinstance(c, list):
+                        provided_counts_flat.extend(c)
+                    else:
+                        provided_counts_flat.append(c)
+            else:
+                provided_counts_flat = list(provided_counts)
+
+        for idx, completion in enumerate(completions_flat):
+            count = provided_counts_flat[idx] if idx < len(provided_counts_flat) else None
+            if count is None:
+                count = _count_tokens(completion)
+            else:
+                try:
+                    count = int(count)
+                except (TypeError, ValueError):
+                    count = _count_tokens(completion)
+            completion_token_counts.append(count)
+
         payload = {
             "iteration": iteration_counter["value"],
             "items": [
                 {
                     "sample_id": sid,
-                    "completion": _completion_to_text(completion),
+                    "completion": completion,
+                    "completion_tokens": completion_token_counts[idx],
                     "completion_index": idx,
                 }
                 for idx, (sid, completion) in enumerate(

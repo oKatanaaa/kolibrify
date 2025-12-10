@@ -22,6 +22,7 @@ class GraderInput:
     completion: str
     reasoning: str | None
     answer: str | None
+    completion_tokens: int | None = None
     completion_index: int | None = None
 
 
@@ -96,6 +97,38 @@ class CategoryMatchGrader(Grader):
             return 0.3
 
         return 0.0
+
+
+class CompletionLengthCapGrader(Grader):
+    """
+    Returns 1.0 when the completion token count is within the configured cap, otherwise 0.0.
+
+    The grader relies on the training loop to supply `completion_tokens` for each sample. If a
+    token count is missing and `treat_missing_as_fail` is True (default), the reward is 0.0.
+    """
+
+    def __init__(self, max_completion_tokens: int, treat_missing_as_fail: bool = True) -> None:
+        if max_completion_tokens <= 0:
+            raise ValueError("max_completion_tokens must be positive")
+        self.max_completion_tokens = max_completion_tokens
+        self.treat_missing_as_fail = treat_missing_as_fail
+
+    async def grade_batch(self, inputs: Sequence[GraderInput]) -> List[GradeResult]:
+        results: List[GradeResult] = []
+        for item in inputs:
+            tokens = item.completion_tokens
+            if tokens is None:
+                reward = 0.0 if self.treat_missing_as_fail else 1.0
+            else:
+                reward = 1.0 if tokens <= self.max_completion_tokens else 0.0
+            results.append(
+                GradeResult(
+                    sample_id=item.sample_id,
+                    reward=reward,
+                    completion_index=item.completion_index,
+                )
+            )
+        return results
 
 
 class ReasoningFormatGrader(Grader):
@@ -513,6 +546,7 @@ class ExternalHttpGrader(Grader):
                     "completion": item.completion,
                     "reasoning": item.reasoning,
                     "final_response": item.answer,
+                    "completion_tokens": item.completion_tokens,
                     "completion_index": item.completion_index,
                 }
                 for item in inputs
@@ -546,6 +580,7 @@ class DatasetReward:
     ):
         self.graders: List[Grader] = []
         weights: List[float] = []
+        self.multiplicative_graders: List[Grader] = []
 
         if dataset_config.graders:
             if len(dataset_config.graders) != len(dataset_config.grader_weights):
@@ -563,6 +598,12 @@ class DatasetReward:
         if not self.graders:
             raise ValueError("Datasets must define at least one grader")
 
+        if dataset_config.multiplicative_graders:
+            for name in dataset_config.multiplicative_graders:
+                if name not in graders:
+                    raise ValueError(f"Unknown multiplicative grader '{name}' referenced by dataset")
+                self.multiplicative_graders.append(graders[name])
+
         total_weight = sum(weights)
         if total_weight <= 0:
             raise ValueError("grader_weights must sum to a positive value")
@@ -576,6 +617,15 @@ class DatasetReward:
         for weight, results in zip(self.weights, grader_outputs):
             for idx, res in enumerate(results):
                 combined[idx] += weight * res.reward
+
+        if self.multiplicative_graders:
+            multiplicative_outputs = await asyncio.gather(
+                *[grader.grade_batch(inputs) for grader in self.multiplicative_graders]
+            )
+            for results in multiplicative_outputs:
+                for idx, res in enumerate(results):
+                    combined[idx] *= res.reward
+
         return [
             GradeResult(
                 sample_id=item.sample_id,
@@ -605,6 +655,7 @@ __all__ = [
     "Grader",
     "GraderInput",
     "CategoryMatchGrader",
+    "CompletionLengthCapGrader",
     "ReasoningFormatGrader",
     "JsonValidGrader",
     "JsonSchemaGrader",

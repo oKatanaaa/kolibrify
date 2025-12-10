@@ -24,6 +24,7 @@ class DatasetConfig:
     path: pathlib.Path
     graders: List[str]
     grader_weights: List[float]
+    multiplicative_graders: List[str]
 
 
 @dataclasses.dataclass
@@ -67,6 +68,12 @@ def _validate_dataset_config(dataset_id: str, cfg: DatasetConfig) -> None:
             raise ConfigError(
                 f"Dataset '{dataset_id}' must have the same number of graders and grader_weights"
             )
+    for name in cfg.graders:
+        if not isinstance(name, str):
+            raise ConfigError(f"Dataset '{dataset_id}' graders must be strings")
+    for name in cfg.multiplicative_graders:
+        if not isinstance(name, str):
+            raise ConfigError(f"Dataset '{dataset_id}' multiplicative_graders must be strings")
 
 
 def _normalize_weights(items: List[StageDatasetConfig]) -> List[StageDatasetConfig]:
@@ -182,10 +189,16 @@ def load_config(path: str) -> RLDataConfig:
         dataset_path = pathlib.Path(cfg["path"])
         if not dataset_path.is_absolute():
             dataset_path = paths.data_root / dataset_path
+        multiplicative_raw = cfg.get("multiplicative_graders") or []
+        if not isinstance(multiplicative_raw, list):
+            raise ConfigError(
+                f"Dataset '{dataset_id}'.multiplicative_graders must be a list if provided"
+            )
         dataset_cfg = DatasetConfig(
             path=dataset_path,
             graders=list(cfg.get("graders") or []),
             grader_weights=[float(w) for w in (cfg.get("grader_weights") or [])],
+            multiplicative_graders=[str(g) for g in multiplicative_raw],
         )
         _validate_dataset_config(dataset_id, dataset_cfg)
         datasets[dataset_id] = dataset_cfg

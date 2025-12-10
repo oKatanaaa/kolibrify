@@ -96,6 +96,7 @@ def main(config_path):
         request_timeout_seconds=config.data.request_timeout_seconds,
         max_retries=config.data.max_retries,
         retry_backoff_seconds=config.data.retry_backoff_seconds,
+        tokenizer=tokenizer,
     )
 
     importance_sampling_level = "token"

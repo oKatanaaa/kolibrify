@@ -57,6 +57,7 @@ class SampleResponse(BaseModel):
 class GradeItem(BaseModel):
     sample_id: str
     completion: str
+    completion_tokens: int | None = None
     completion_index: int | None = None
 
 
@@ -207,6 +208,7 @@ class RLDataServer:
                     completion=item.completion,
                     reasoning=reasoning,
                     answer=answer,
+                    completion_tokens=item.completion_tokens,
                     completion_index=item.completion_index,
                 )
             )
