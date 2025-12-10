@@ -107,6 +107,8 @@ class RemoteRLDataset(torch.utils.data.Dataset):
         self.retry_backoff_seconds = max(float(retry_backoff_seconds), 0.0)
         self.request_timeout_seconds = float(request_timeout_seconds)
         self.meta_timeout_seconds = float(meta_timeout_seconds)
+        self._base_length = None
+        self._dataset_length = None
         self.session = requests.Session()
 
         meta = _fetch_meta(
@@ -123,6 +125,24 @@ class RemoteRLDataset(torch.utils.data.Dataset):
             total_iterations = 1000
 
         self.total_iterations = int(total_iterations)
+
+        # HuggingFace trainers wrap map-style datasets with DistributedSampler for DDP,
+        # which divides the dataset length by WORLD_SIZE. If we return only the per-device
+        # length here, large WORLD_SIZE values prevent later curriculum stages from ever
+        # being reached (e.g., with 8 GPUs, iterations may stay below 100 forever).
+        # To keep per-rank sampling aligned with the intended iteration schedule, scale the
+        # reported length by WORLD_SIZE but wrap indices back into the base range inside
+        # __getitem__. This keeps the number of optimizer steps per rank at total_iterations
+        # while avoiding dataserver oversubscription.
+        world_size = 1
+        try:
+            world_size = max(int(os.environ.get("WORLD_SIZE", "1")), 1)
+        except Exception:
+            world_size = 1
+
+        self._base_length = self.total_iterations * self.grad_accum * self.batch_size
+        self._dataset_length = self._base_length * world_size
+
         # Cache responses per (iteration, grad_accum_step) so each micro-batch
         # makes its own /sample request instead of sharing across accumulation.
         self._iteration_cache: Dict[tuple[int, int], List[Dict]] = {}
@@ -133,7 +153,8 @@ class RemoteRLDataset(torch.utils.data.Dataset):
             "Creating RL dataset with server at "
             f"{self.server_url} for {self.total_iterations} iterations "
             f"using per-device batch size {self.batch_size}, "
-            f"grad_accum={self.grad_accum}{world_size_note}"
+            f"grad_accum={self.grad_accum}, "
+            f"dataset_length={self._dataset_length}{world_size_note}"
         )
 
     def _reset_session(self):
@@ -144,10 +165,9 @@ class RemoteRLDataset(torch.utils.data.Dataset):
         self.session = requests.Session()
 
     def __len__(self) -> int:
-        # Each dataserver iteration corresponds to one optimizer step; the trainer
-        # issues grad_accum micro-batches per step, so scale the dataset length to
-        # avoid wrapping and resampling early stages.
-        return self.total_iterations * self.grad_accum * self.batch_size
+        # The length is scaled by WORLD_SIZE so DistributedSampler in DDP
+        # does not truncate the effective iteration range per rank.
+        return self._dataset_length
 
     def _rows_for_iteration(self, iteration: int, accum_step: int) -> List[Dict]:
         cache_key = (iteration, accum_step)
@@ -184,10 +204,14 @@ class RemoteRLDataset(torch.utils.data.Dataset):
         if idx < 0 or idx >= len(self):
             raise IndexError
 
-        micro_batch = idx // self.batch_size
+        # Map any DistributedSampler-strided index back into the base range
+        # so curriculum stages advance correctly on every rank.
+        base_idx = idx % self._base_length
+
+        micro_batch = base_idx // self.batch_size
         iteration = micro_batch // self.grad_accum
         accum_step = micro_batch % self.grad_accum
-        offset = idx % self.batch_size
+        offset = base_idx % self.batch_size
         rows = self._rows_for_iteration(iteration, accum_step)
 
         if not rows:
