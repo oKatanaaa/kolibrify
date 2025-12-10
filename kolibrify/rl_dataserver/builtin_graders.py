@@ -6,6 +6,7 @@ from typing import Dict, Tuple
 # instantiated via the RL dataserver config.
 BUILTIN_PYTHON_GRADERS: Dict[str, Tuple[str, str]] = {
     "category_match": ("kolibrify.rl_dataserver.graders", "CategoryMatchGrader"),
+    "completion_length_cap": ("kolibrify.rl_dataserver.graders", "CompletionLengthCapGrader"),
 }
 
 __all__ = ["BUILTIN_PYTHON_GRADERS"]
