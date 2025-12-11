@@ -84,6 +84,7 @@ def main(config_path):
         server_url=config.data.server_url,
         per_device_batch_size=config.training.per_device_train_batch_size,
         gradient_accumulation_steps=config.training.gradient_accumulation_steps,
+        num_generations=config.training.num_generations,
         max_retries=config.data.max_retries,
         retry_backoff_seconds=config.data.retry_backoff_seconds,
         request_timeout_seconds=config.data.request_timeout_seconds,
