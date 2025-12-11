@@ -280,6 +280,12 @@ def create_app(config_path: str, verbose: bool = False) -> FastAPI:
 
     @app.post("/sample", response_model=SampleResponse)
     async def sample(req: SampleRequest) -> SampleResponse:
+        if server.verbose:
+            stage = server._find_stage(req.iteration)
+            print(
+                f"[dataserver] /sample iteration={req.iteration} "
+                f"batch_size={req.batch_size} stage={stage.name}"
+            )
         samples = server.sample_batch(req.iteration, req.batch_size)
         return SampleResponse(samples=samples)
 
