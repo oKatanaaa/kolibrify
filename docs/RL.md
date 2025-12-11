@@ -3,7 +3,7 @@
 Kolibrify’s RL pipeline is intentionally split into two cooperating pieces: a lightweight RL dataserver that owns data sampling and reward grading, and the training process that runs GRPO/GSPO with Unsloth models.
 
 ## Architecture
-- **RL dataserver** (`kolibrify-rl-dataserver`): FastAPI service that samples training prompts and grades completions. It loads datasets from local JSONL files, applies graders, and returns scalar rewards. Curriculum is expressed as stages in the dataserver config; each stage mixes datasets with weights and has an `until_step` boundary.
+- **RL dataserver** (`kolibrify-rl-dataserver`): FastAPI service that samples training prompts and grades completions. It loads datasets from local JSONL files, applies graders, and returns scalar rewards. Curriculum is expressed as stages in the dataserver config; each stage mixes datasets with weights and has an `until_step` boundary. Run with `--verbose` to log `/sample` request params and per-iteration `/grade` summaries.
 - **RL trainer** (`kolibrify-rl-train`): Runs GRPO/GSPO using TRL. It streams prompts from the dataserver (per-device batches), generates completions, and posts them back for grading. All model/hyperparameter choices live in the training YAML.
 
 ## Built-in Response Format

@@ -91,6 +91,7 @@ class RemoteRLDataset(torch.utils.data.Dataset):
         per_device_batch_size: int,
         gradient_accumulation_steps: int,
         *,
+        num_generations: int = 1,
         max_retries: int = 3,
         retry_backoff_seconds: float = 1.0,
         request_timeout_seconds: float = 60.0,
@@ -103,6 +104,27 @@ class RemoteRLDataset(torch.utils.data.Dataset):
         self.server_url = server_url.rstrip("/")
         self.batch_size = per_device_batch_size
         self.grad_accum = max(int(gradient_accumulation_steps), 1)
+        self.num_generations = max(int(num_generations), 1)
+
+        # GRPO (via TRL RepeatSampler) repeats each unique prompt num_generations times.
+        # To keep curriculum aligned with optimizer steps, we advance dataserver
+        # iterations per GRPO "generation step" rather than per raw sampler index.
+        # See docs/RL_GRPO_ITERATION.md for a full explanation.
+        if self.num_generations == 1:
+            self.prompts_per_step = self.batch_size
+        else:
+            if self.batch_size % self.num_generations != 0:
+                print(
+                    f"WARNING: per_device_batch_size={self.batch_size} not divisible by "
+                    f"num_generations={self.num_generations}. Falling back to 1 prompt/step."
+                )
+                self.prompts_per_step = 1
+            else:
+                self.prompts_per_step = self.batch_size // self.num_generations
+
+        # In TRL GRPO, sampler indices advance in units of unique prompts
+        # (each index is then repeated num_generations times). So a GRPO step
+        # corresponds to prompts_per_step *unique* indices.
         self.max_retries = max(int(max_retries), 0)
         self.retry_backoff_seconds = max(float(retry_backoff_seconds), 0.0)
         self.request_timeout_seconds = float(request_timeout_seconds)
@@ -140,10 +162,12 @@ class RemoteRLDataset(torch.utils.data.Dataset):
         except Exception:
             world_size = 1
 
-        self._base_length = self.total_iterations * self.grad_accum * self.batch_size
+        # Base length counts unique prompt indices. Each GRPO step consumes
+        # prompts_per_step unique indices per rank.
+        self._base_length = self.total_iterations * self.grad_accum * self.prompts_per_step
         self._dataset_length = self._base_length * world_size
 
-        # Cache responses per (iteration, grad_accum_step) so each micro-batch
+        # Cache responses per (generation_step, grad_accum_step) so each GRPO step
         # makes its own /sample request instead of sharing across accumulation.
         self._iteration_cache: Dict[tuple[int, int], List[Dict]] = {}
 
@@ -152,7 +176,8 @@ class RemoteRLDataset(torch.utils.data.Dataset):
         print(
             "Creating RL dataset with server at "
             f"{self.server_url} for {self.total_iterations} iterations "
-            f"using per-device batch size {self.batch_size}, "
+            f"using per-device batch size {self.batch_size} "
+            f"(prompts_per_step={self.prompts_per_step}, num_generations={self.num_generations}), "
             f"grad_accum={self.grad_accum}, "
             f"dataset_length={self._dataset_length}{world_size_note}"
         )
@@ -169,21 +194,21 @@ class RemoteRLDataset(torch.utils.data.Dataset):
         # does not truncate the effective iteration range per rank.
         return self._dataset_length
 
-    def _rows_for_iteration(self, iteration: int, accum_step: int) -> List[Dict]:
-        cache_key = (iteration, accum_step)
+    def _rows_for_iteration(self, generation_step: int, accum_step: int) -> List[Dict]:
+        cache_key = (generation_step, accum_step)
         if cache_key not in self._iteration_cache:
             samples = _sample_batch(
                 self.session,
                 self.server_url,
-                iteration,
-                self.batch_size,
+                generation_step,
+                self.prompts_per_step,
                 timeout_seconds=self.request_timeout_seconds,
                 max_retries=self.max_retries,
                 retry_backoff_seconds=self.retry_backoff_seconds,
                 reset_session=self._reset_session,
             )
             if not samples:
-                raise RuntimeError(f"RL dataserver returned no samples at iteration {iteration}.")
+                raise RuntimeError(f"RL dataserver returned no samples at iteration {generation_step}.")
 
             rows: List[Dict] = []
             for sample in samples:
@@ -208,17 +233,17 @@ class RemoteRLDataset(torch.utils.data.Dataset):
         # so curriculum stages advance correctly on every rank.
         base_idx = idx % self._base_length
 
-        micro_batch = base_idx // self.batch_size
-        iteration = micro_batch // self.grad_accum
+        micro_batch = base_idx // self.prompts_per_step
+        generation_step = micro_batch // self.grad_accum
         accum_step = micro_batch % self.grad_accum
-        offset = base_idx % self.batch_size
-        rows = self._rows_for_iteration(iteration, accum_step)
+        prompt_slot = base_idx % self.prompts_per_step
+        rows = self._rows_for_iteration(generation_step, accum_step)
 
         if not rows:
-            raise IndexError(f"No RL samples available for iteration {iteration}.")
+            raise IndexError(f"No RL samples available for iteration {generation_step}.")
 
         # If the dataserver returned fewer than the requested batch, recycle rows as needed.
-        return rows[offset % len(rows)]
+        return rows[prompt_slot % len(rows)]
 
 
 def create_rl_dataset(
@@ -226,6 +251,7 @@ def create_rl_dataset(
     per_device_batch_size: int,
     gradient_accumulation_steps: int,
     *,
+    num_generations: int = 1,
     max_retries: int = 3,
     retry_backoff_seconds: float = 1.0,
     request_timeout_seconds: float = 60.0,
@@ -235,6 +261,7 @@ def create_rl_dataset(
         server_url,
         per_device_batch_size,
         gradient_accumulation_steps,
+        num_generations=num_generations,
         max_retries=max_retries,
         retry_backoff_seconds=retry_backoff_seconds,
         request_timeout_seconds=request_timeout_seconds,
