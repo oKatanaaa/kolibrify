@@ -60,6 +60,7 @@ def main(config_path):
         map_eos=config.model.map_eos_to_imend,
         new_tokens=config.model.custom_tokens,
         device_map=device_map,
+        fast_inference=True,
     )
     free_mem()
     print("Model loaded.")

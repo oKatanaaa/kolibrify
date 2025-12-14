@@ -17,7 +17,8 @@ def get_model(
     model_name, load_in_4bit=True, 
     max_seq_length=4096, device_map='auto', 
     add_imstart_token=False, map_eos=True,
-    hf_token=None, loading_lora=False, new_tokens=None
+    hf_token=None, loading_lora=False, new_tokens=None,
+    fast_inference=False,
 ):
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name=model_name,
@@ -25,6 +26,7 @@ def get_model(
         max_seq_length=max_seq_length,
         device_map=device_map,
         token=hf_token,
+        fast_inference=fast_inference,
     )
 
     tokenizer = update_tokenizer_and_model(
