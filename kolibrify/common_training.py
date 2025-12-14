@@ -93,6 +93,7 @@ def apply_lora_adapter(model, config, gradient_checkpointing: str | bool = "unsl
     from unsloth import FastLanguageModel
 
     print("Applying LoRA adapter...")
+    tied_embeddings = bool(getattr(getattr(model, "config", None), "tie_word_embeddings", False))
     return FastLanguageModel.get_peft_model(
         model,
         r=config.lora_r,
@@ -104,7 +105,8 @@ def apply_lora_adapter(model, config, gradient_checkpointing: str | bool = "unsl
         use_gradient_checkpointing=gradient_checkpointing,
         max_seq_length=config.max_ctx_len,
         random_state=322,
-        use_rslora=config.use_rslora
+        use_rslora=config.use_rslora,
+        ensure_weight_tying=tied_embeddings,
     )
 
 def run_training(trainer, config, tokenizer=None):
