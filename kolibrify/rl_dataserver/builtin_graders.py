@@ -7,6 +7,8 @@ from typing import Dict, Tuple
 BUILTIN_PYTHON_GRADERS: Dict[str, Tuple[str, str]] = {
     "category_match": ("kolibrify.rl_dataserver.graders", "CategoryMatchGrader"),
     "completion_length_cap": ("kolibrify.rl_dataserver.graders", "CompletionLengthCapGrader"),
+    "math-verify": ("kolibrify.rl_dataserver.graders", "MathVerifyGrader"),
+    "latex_only": ("kolibrify.rl_dataserver.graders", "LatexOnlyAnswerGrader"),
 }
 
 __all__ = ["BUILTIN_PYTHON_GRADERS"]

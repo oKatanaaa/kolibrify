@@ -4,6 +4,8 @@ Kolibrify ships several built-in graders and lets you add your own (Python modul
 
 ## Built-in Graders (quick lookup)
 - `math_exact` – accept if the final response contains the gold number (exact string match).
+- `math-verify` – LaTeX-aware `math_verify` check against the gold answer.
+- `latex_only` – 1.0 only when the final answer is pure LaTeX with no surrounding text.
 - `number_only` – reward short numeric outputs; penalize extra characters around the first number.
 - `json_valid` – reward parseable JSON (optionally require keys).
 - `json_schema` – validate object shape against a minimal schema.
@@ -70,6 +72,18 @@ The server will also attach the reasoning-format grader automatically and normal
 - Type: any valid JSON → at least 0.5; non-object returns 0.5 directly.
 - Fields: `required` list; `allow_additional_properties` (default true).
 - Scoring: missing required + extra keys → 0.7; missing required → 0.8; extra keys when disallowed → 0.9; perfect match → 1.0 (then apply any 0.9 penalty).
+
+### Latex Only (`latex_only`)
+- Purpose: enforce that the final answer is *only* LaTeX (no surrounding prose).
+- Accepted after stripping whitespace: `$...$`, `$$...$$`, `\\(...\\)`, `\\[...\\]`, `\\boxed{...}`, or `\\begin{env} ... \\end{env}`.
+- Reward: 1.0 if it matches one of the above patterns, else 0.0. Simple regex heuristic (not a full LaTeX parser).
+
+### Math Verify (`math-verify`)
+- Purpose: strict math checking with the `math_verify` library (handles LaTeX, normalization, and symbolic comparison).
+- Inputs: gold answer from `record["answer"]`; prediction uses the parsed final answer (`item.answer`), not the raw completion.
+- Formatting: expects LaTeX-ish answers (`$...$`, `\\(...\\)`, `\\[...\\]`, `$$...$$`, `\\boxed{...}`, etc). Uses a LaTeX-only extraction config.
+- Reward: 0.0 if missing/unparseable; 0.5 if the prediction parses; 1.0 if both sides parse and `math_verify.verify(..., strict=True)` matches.
+- Dependency: requires `math-verify` (now included in kolibrify deps). Timeouts: 2s for parsing and 2s for verification.
 
 ### XML Schema (`xml_schema`)
 - Purpose: simple XML wrapper check using `record["metadata"]["schema"]` with `{"root_tag": "answer"}`.

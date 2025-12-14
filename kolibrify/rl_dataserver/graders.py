@@ -447,6 +447,157 @@ class XmlSchemaGrader(Grader):
 _number_re = re.compile(r"[-+]?\d*\.\d+|[-+]?\d+")
 
 
+_BEGIN_END_RE = re.compile(
+    r"^\\begin\{([a-zA-Z*]+)\}.*?\\end\{\1\}$",
+    flags=re.DOTALL,
+)
+
+_LATEX_ONLY_RE = re.compile(
+    r"^(?:"
+    r"\$\$.*\$\$"  # $$...$$
+    r"|\$.*\$"  # $...$
+    r"|\\\[.*\\\]"  # \[...\]
+    r"|\\\(.*\\\)"  # \(...\)
+    r"|\\boxed\{.*\}"  # \boxed{...}
+    r")$",
+    flags=re.DOTALL,
+)
+
+
+class LatexOnlyAnswerGrader(Grader):
+    """
+    Returns 1.0 iff the model's final answer (`item.answer`) contains *only* LaTeX,
+    with no surrounding explanation text.
+
+    Accepted forms (after stripping whitespace):
+      - $...$
+      - $$...$$
+      - \\(...\\)
+      - \\[...\\]
+      - \\boxed{...}
+      - \\begin{env} ... \\end{env}
+
+    Note: this is intentionally a simple heuristic (not a full LaTeX parser).
+    """
+
+    async def grade_batch(self, inputs: Sequence[GraderInput]) -> List[GradeResult]:
+        results: List[GradeResult] = []
+        for item in inputs:
+            text = (item.answer or "").strip()
+            ok = bool(text) and (
+                _LATEX_ONLY_RE.match(text) is not None or _BEGIN_END_RE.match(text) is not None
+            )
+            results.append(
+                GradeResult(
+                    sample_id=item.sample_id,
+                    reward=1.0 if ok else 0.0,
+                    completion_index=item.completion_index,
+                )
+            )
+        return results
+
+
+class MathVerifyGrader(Grader):
+    """
+    Minimal math-verify grader with explicit formatting requirements.
+
+    - Reads gold from `record["answer"]` (string).
+    - Expects LaTeX-ish answers (any standard math environment is fine: `$...$`, `\\(...\\)`, `\\[...\\]`, `$$...$$`, `\\boxed{...}`, etc).
+    - Uses ONLY the parsed final answer (`item.answer`). Never falls back to `item.completion`.
+
+    Reward:
+      - 0.0: answer missing or unparseable
+      - 0.5: answer parseable (LaTeX extraction succeeded)
+      - 1.0: answer parseable AND verifies equal to gold
+    """
+
+    def __init__(self, parsing_timeout: float | int = 2, verification_timeout: float | int = 2) -> None:
+        try:
+            from math_verify import LatexExtractionConfig, parse, verify  # type: ignore
+            from math_verify.parser import NormalizationConfig  # type: ignore
+        except Exception as exc:  # pragma: no cover - import guard
+            raise ImportError(
+                "MathVerifyGrader requires the 'math-verify' package. Install it via `pip install math-verify`."
+            ) from exc
+
+        self._parse = parse
+        self._verify = verify
+        parsed_timeout = None if parsing_timeout is None else int(parsing_timeout)
+        self._parsing_timeout = parsed_timeout
+        verification_timeout_int = None if verification_timeout is None else int(verification_timeout)
+        self._verification_timeout = verification_timeout_int
+        self._extraction_config = [
+            LatexExtractionConfig(
+                try_extract_without_anchor=True,
+                boxed_match_priority=0,
+                normalization_config=NormalizationConfig(
+                    basic_latex=True,
+                    units=True,
+                    malformed_operators=False,
+                    nits=False,
+                    boxed="all",
+                    equations=False,
+                ),
+            )
+        ]
+
+    async def grade_batch(self, inputs: Sequence[GraderInput]) -> List[GradeResult]:
+        results: List[GradeResult] = []
+        for item in inputs:
+            gold = ""
+            if isinstance(item.record, Mapping):
+                gold = str(item.record.get("answer") or "")
+
+            pred_text = item.answer.strip() if item.answer else ""
+            if not pred_text:
+                results.append(
+                    GradeResult(
+                        sample_id=item.sample_id,
+                        reward=0.0,
+                        completion_index=item.completion_index,
+                    )
+                )
+                continue
+
+            gold_parsed = self._parse(
+                gold,
+                extraction_config=self._extraction_config,
+                parsing_timeout=self._parsing_timeout,
+                raise_on_error=False,
+            )
+            pred_parsed = self._parse(
+                pred_text,
+                extraction_config=self._extraction_config,
+                parsing_timeout=self._parsing_timeout,
+                raise_on_error=False,
+            )
+
+            reward = 0.0
+            if pred_parsed:
+                reward = 0.5
+
+            ok = False
+            if gold_parsed and pred_parsed:
+                ok = self._verify(
+                    gold_parsed,
+                    pred_parsed,
+                    strict=True,
+                    timeout_seconds=self._verification_timeout,
+                    raise_on_error=False,
+                )
+                if ok:
+                    reward = 1.0
+
+            results.append(
+                GradeResult(
+                    sample_id=item.sample_id,
+                    reward=reward,
+                    completion_index=item.completion_index,
+                )
+            )
+        return results
+
+
 class MathExactGrader(Grader):
     async def grade_batch(self, inputs: Sequence[GraderInput]) -> List[GradeResult]:
         results: List[GradeResult] = []
@@ -659,6 +810,8 @@ __all__ = [
     "ReasoningFormatGrader",
     "JsonValidGrader",
     "JsonSchemaGrader",
+    "LatexOnlyAnswerGrader",
+    "MathVerifyGrader",
     "MathExactGrader",
     "NumberOnlyGrader",
     "XmlSchemaGrader",

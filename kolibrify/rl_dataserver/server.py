@@ -20,6 +20,8 @@ from .graders import (
     GraderInput,
     JsonValidGrader,
     JsonSchemaGrader,
+    LatexOnlyAnswerGrader,
+    MathVerifyGrader,
     MathExactGrader,
     NumberOnlyGrader,
     ReasoningFormatGrader,
@@ -90,6 +92,8 @@ class RLDataServer:
         graders: Dict[str, object] = {
             "json_valid": JsonValidGrader(),
             "json_schema": JsonSchemaGrader(),
+            "latex_only": LatexOnlyAnswerGrader(),
+            "math-verify": MathVerifyGrader(),
             "math_exact": MathExactGrader(),
             "number_only": NumberOnlyGrader(),
             "xml_schema": XmlSchemaGrader(),
