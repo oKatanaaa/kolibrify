@@ -28,6 +28,7 @@ class _ConstGrader(Grader):
 def test_completion_length_cap_grader_handles_limits_and_missing_tokens():
     grader = CompletionLengthCapGrader(max_completion_tokens=5)
     lenient = CompletionLengthCapGrader(max_completion_tokens=5, treat_missing_as_fail=False)
+    floored = CompletionLengthCapGrader(max_completion_tokens=5, min_reward=0.2)
 
     inputs = [
         GraderInput(
@@ -58,9 +59,11 @@ def test_completion_length_cap_grader_handles_limits_and_missing_tokens():
 
     strict_results = asyncio.run(grader.grade_batch(inputs))
     lenient_results = asyncio.run(lenient.grade_batch(inputs))
+    floored_results = asyncio.run(floored.grade_batch(inputs))
 
     assert [r.reward for r in strict_results] == [1.0, 0.0, 0.0]
     assert [r.reward for r in lenient_results] == [1.0, 0.0, 1.0]
+    assert [r.reward for r in floored_results] == [1.0, 0.2, 0.2]
 
 
 def test_dataset_reward_multiplies_multiplicative_graders():

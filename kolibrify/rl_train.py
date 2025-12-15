@@ -111,6 +111,7 @@ def main(config_path):
     training_args = GRPOConfig(
         output_dir=config.paths.output_dir,
         per_device_train_batch_size=config.training.per_device_train_batch_size,
+        generation_batch_size=config.training.per_device_train_batch_size,
         gradient_accumulation_steps=config.training.gradient_accumulation_steps,
         num_generations=config.training.num_generations,
         temperature=config.training.temperature,

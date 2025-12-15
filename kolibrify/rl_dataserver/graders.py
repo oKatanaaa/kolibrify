@@ -107,20 +107,28 @@ class CompletionLengthCapGrader(Grader):
     token count is missing and `treat_missing_as_fail` is True (default), the reward is 0.0.
     """
 
-    def __init__(self, max_completion_tokens: int, treat_missing_as_fail: bool = True) -> None:
+    def __init__(
+        self,
+        max_completion_tokens: int,
+        treat_missing_as_fail: bool = True,
+        min_reward: float = 0.0,
+    ) -> None:
         if max_completion_tokens <= 0:
             raise ValueError("max_completion_tokens must be positive")
+        if not (0.0 <= min_reward <= 1.0):
+            raise ValueError("min_reward must be between 0.0 and 1.0")
         self.max_completion_tokens = max_completion_tokens
         self.treat_missing_as_fail = treat_missing_as_fail
+        self.min_reward = min_reward
 
     async def grade_batch(self, inputs: Sequence[GraderInput]) -> List[GradeResult]:
         results: List[GradeResult] = []
         for item in inputs:
             tokens = item.completion_tokens
             if tokens is None:
-                reward = 0.0 if self.treat_missing_as_fail else 1.0
+                reward = self.min_reward if self.treat_missing_as_fail else 1.0
             else:
-                reward = 1.0 if tokens <= self.max_completion_tokens else 0.0
+                reward = 1.0 if tokens <= self.max_completion_tokens else self.min_reward
             results.append(
                 GradeResult(
                     sample_id=item.sample_id,
