@@ -124,8 +124,16 @@ def build_remote_reward_fn(
                     count = _count_tokens(completion)
             completion_token_counts.append(count)
 
+        trainer_state = kwargs.get("trainer_state")
+        iteration = iteration_counter["value"]
+        if trainer_state is not None:
+            iteration = getattr(trainer_state, "global_step", None)
+            if iteration is None and isinstance(trainer_state, dict):
+                iteration = trainer_state.get("global_step", iteration_counter["value"])
+            iteration = iteration if iteration is not None else iteration_counter["value"]
+
         payload = {
-            "iteration": iteration_counter["value"],
+            "iteration": iteration,
             "items": [
                 {
                     "sample_id": sid,
@@ -166,7 +174,8 @@ def build_remote_reward_fn(
         except Exception as e:
             print(f"Failed to grade iteration {iteration_counter['value']}: {e}")
 
-        iteration_counter["value"] += 1
+        if trainer_state is None:
+            iteration_counter["value"] += 1
         return rewards
 
     return reward_fn

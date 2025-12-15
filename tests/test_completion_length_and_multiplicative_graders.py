@@ -133,3 +133,40 @@ def test_reward_fn_adds_completion_tokens(monkeypatch):
     items = captured["json"]["items"]
     assert [item["completion_tokens"] for item in items] == [1, 3]
     assert [item["completion"] for item in items] == ["short", "a bit longer"]
+    # Ensure iteration defaults to local counter (starts at 0)
+    assert captured["json"]["iteration"] == 0
+
+
+def test_reward_fn_uses_trainer_state_global_step(monkeypatch):
+    captured = {}
+
+    class DummyResponse:
+        def __init__(self):
+            self.called = True
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"results": []}
+
+    class DummySession:
+        def post(self, url, json=None, timeout=None):
+            captured["json"] = json
+            return DummyResponse()
+
+    monkeypatch.setattr(rewards_module.requests, "Session", lambda: DummySession())
+
+    reward_fn = rewards_module.build_remote_reward_fn(
+        "http://server",
+        tokenizer=None,
+        max_retries=0,
+        retry_backoff_seconds=0.0,
+    )
+
+    _ = reward_fn(["x"], sample_id=["s:0"], trainer_state={"global_step": 42})
+    assert captured["json"]["iteration"] == 42
+
+    # Fallback to local counter when trainer_state is missing
+    _ = reward_fn(["y"], sample_id=["s:1"])
+    assert captured["json"]["iteration"] == 0
